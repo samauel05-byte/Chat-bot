@@ -322,8 +322,8 @@ function MessageBubble({
 
 function WelcomeCard() {
   const steps = [
-    { icon: "🏢", text: "Cuéntame el RNC y el nombre de tu empresa" },
     { icon: "📸", text: "Sube la foto o el PDF de una factura (o varias a la vez)" },
+    { icon: "🏢", text: "Detecto el RNC y el nombre de tu empresa solo — no hace falta que los escribas" },
     { icon: "✅", text: "Revisa lo que extraje y confírmalo" },
     { icon: "📊", text: "Pídeme el reporte del mes cuando lo necesites" },
   ];
