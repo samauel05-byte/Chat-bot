@@ -13,6 +13,7 @@
     "@ai-sdk/anthropic": "^4.0.40",
     "@ai-sdk/react": "^4.0.73",
     "@trigger.dev/sdk": "^4.5.12",
+    "@vercel/blob": "^2.8.0",
     "ai": "^7.0.70",
     "exceljs": "^4.4.0",
     "next": "16.3.1",

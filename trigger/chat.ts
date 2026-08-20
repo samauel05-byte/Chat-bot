@@ -22,7 +22,7 @@ const tools = {
       "Obtiene el RNC y nombre de la empresa configurados. Llama esto al inicio de la conversación si no sabes el RNC de la empresa todavía.",
     inputSchema: z.object({}),
     execute: async () => {
-      const config = getCompanyConfig();
+      const config = await getCompanyConfig();
       return config ?? { message: "No hay empresa configurada todavía." };
     },
   }),
@@ -35,7 +35,7 @@ const tools = {
       nombre: z.string().min(1),
     }),
     execute: async ({ rnc, nombre }) => {
-      setCompanyConfig({ rnc, nombre });
+      await setCompanyConfig({ rnc, nombre });
       return { ok: true };
     },
   }),
@@ -45,7 +45,7 @@ const tools = {
       "Registra una factura de COMPRA (formato 606) ya confirmada por el usuario. Solo llama esto después de mostrarle los datos extraídos y que el usuario los confirme explícitamente.",
     inputSchema: invoice606Schema,
     execute: async (input) => {
-      const lineas = appendInvoice606(input);
+      const lineas = await appendInvoice606(input);
       return { ok: true, lineas, tipo: "606" as const };
     },
   }),
@@ -55,7 +55,7 @@ const tools = {
       "Registra una factura de VENTA (formato 607) ya confirmada por el usuario. Solo llama esto después de mostrarle los datos extraídos y que el usuario los confirme explícitamente.",
     inputSchema: invoice607Schema,
     execute: async (input) => {
-      const lineas = appendInvoice607(input);
+      const lineas = await appendInvoice607(input);
       return { ok: true, lineas, tipo: "607" as const };
     },
   }),
@@ -120,7 +120,7 @@ export const invoiceChat = chat.agent({
     },
   },
   run: async ({ messages, tools: runTools, signal }) => {
-    const config = getCompanyConfig();
+    const config = await getCompanyConfig();
     const system = config
       ? `${SYSTEM_PROMPT_BASE}\n\nEmpresa configurada: RNC ${config.rnc}, ${config.nombre}.`
       : `${SYSTEM_PROMPT_BASE}\n\nTodavía no hay empresa configurada — pide el RNC antes de procesar facturas.`;

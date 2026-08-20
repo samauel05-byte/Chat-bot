@@ -1,7 +1,7 @@
-import fs from "node:fs";
+import { get } from "@vercel/blob";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { EXPORTS_DIR } from "@/lib/dgii/store";
+import { EXPORTS_PREFIX } from "@/lib/dgii/store";
 
 const CONTENT_TYPES: Record<string, string> = {
   ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -19,16 +19,15 @@ export async function GET(
     return NextResponse.json({ error: "Nombre de archivo inválido" }, { status: 400 });
   }
 
-  const filePath = path.join(EXPORTS_DIR, filename);
-  if (!fs.existsSync(filePath)) {
+  const result = await get(`${EXPORTS_PREFIX}${filename}`, { access: "private" });
+  if (!result || !result.stream) {
     return NextResponse.json({ error: "Archivo no encontrado" }, { status: 404 });
   }
 
   const ext = path.extname(filename).toLowerCase();
   const contentType = CONTENT_TYPES[ext] ?? "application/octet-stream";
-  const data = fs.readFileSync(filePath);
 
-  return new NextResponse(new Uint8Array(data), {
+  return new NextResponse(result.stream, {
     headers: {
       "Content-Type": contentType,
       "Content-Disposition": `attachment; filename="${filename}"`,

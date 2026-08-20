@@ -1,17 +1,15 @@
-import fs from "node:fs";
-import path from "node:path";
+import { get, put } from "@vercel/blob";
 import Papa from "papaparse";
 import { COLUMNS_606, type Invoice606 } from "./schema606";
 import { COLUMNS_607, type Invoice607 } from "./schema607";
 
 export type Tipo = "606" | "607";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const CONFIG_PATH = path.join(DATA_DIR, "config.json");
-export const EXPORTS_DIR = path.join(DATA_DIR, "exports");
+const CONFIG_PATHNAME = "config.json";
+export const EXPORTS_PREFIX = "exports/";
 
-function csvPath(tipo: Tipo): string {
-  return tipo === "606" ? path.join(DATA_DIR, "606.csv") : path.join(DATA_DIR, "607.csv");
+function csvPathname(tipo: Tipo): string {
+  return tipo === "606" ? "606.csv" : "607.csv";
 }
 
 const COLUMNS: Record<Tipo, { key: string; header: string }[]> = {
@@ -21,26 +19,35 @@ const COLUMNS: Record<Tipo, { key: string; header: string }[]> = {
 
 export type CompanyConfig = { rnc: string; nombre: string };
 
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+/** Lee el contenido de texto de un blob privado, o null si no existe. */
+async function readBlobText(pathname: string): Promise<string | null> {
+  const result = await get(pathname, { access: "private", useCache: false });
+  if (!result || !result.stream) return null;
+  return new Response(result.stream).text();
 }
 
-export function getCompanyConfig(): CompanyConfig | null {
-  ensureDataDir();
-  if (!fs.existsSync(CONFIG_PATH)) return null;
-  return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+async function writeBlobText(pathname: string, content: string, contentType: string) {
+  await put(pathname, content, {
+    access: "private",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType,
+  });
 }
 
-export function setCompanyConfig(config: CompanyConfig): void {
-  ensureDataDir();
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+export async function getCompanyConfig(): Promise<CompanyConfig | null> {
+  const text = await readBlobText(CONFIG_PATHNAME);
+  return text ? JSON.parse(text) : null;
+}
+
+export async function setCompanyConfig(config: CompanyConfig): Promise<void> {
+  await writeBlobText(CONFIG_PATHNAME, JSON.stringify(config, null, 2), "application/json");
 }
 
 /** Lee el CSV de trabajo de un formato como filas planas { header: valorTexto }. */
-export function readRows(tipo: Tipo): Record<string, string>[] {
-  const filePath = csvPath(tipo);
-  if (!fs.existsSync(filePath)) return [];
-  const content = fs.readFileSync(filePath, "utf8");
+export async function readRows(tipo: Tipo): Promise<Record<string, string>[]> {
+  const content = await readBlobText(csvPathname(tipo));
+  if (!content) return [];
   const parsed = Papa.parse<Record<string, string>>(content, {
     header: true,
     skipEmptyLines: true,
@@ -49,18 +56,19 @@ export function readRows(tipo: Tipo): Record<string, string>[] {
 }
 
 /** Filtra filas por período (YYYYMM) comparando contra "Fecha Comprobante". */
-export function listInvoices(tipo: Tipo, periodo?: string): Record<string, string>[] {
-  const rows = readRows(tipo);
+export async function listInvoices(
+  tipo: Tipo,
+  periodo?: string
+): Promise<Record<string, string>[]> {
+  const rows = await readRows(tipo);
   if (!periodo) return rows;
   return rows.filter((r) => (r["Fecha Comprobante"] ?? "").replace(/-/g, "").startsWith(periodo));
 }
 
-function appendRow(tipo: Tipo, record: Record<string, unknown>): number {
-  ensureDataDir();
-  const filePath = csvPath(tipo);
+async function appendRow(tipo: Tipo, record: Record<string, unknown>): Promise<number> {
   const columns = COLUMNS[tipo];
-  const exists = fs.existsSync(filePath);
-  const lineas = exists ? readRows(tipo).length + 1 : 1;
+  const existingRows = await readRows(tipo);
+  const lineas = existingRows.length + 1;
   const row: Record<string, unknown> = { ...record, lineas, estatus: "" };
 
   const values = columns.map(({ key }) => {
@@ -70,24 +78,21 @@ function appendRow(tipo: Tipo, record: Record<string, unknown>): number {
     return String(v);
   });
 
-  const csvLine = Papa.unparse([values], { header: false });
-  if (!exists) {
-    const headerLine = Papa.unparse([columns.map((c) => c.header)], { header: false });
-    fs.writeFileSync(filePath, headerLine + "\n" + csvLine + "\n");
-  } else {
-    fs.appendFileSync(filePath, csvLine + "\n");
-  }
+  const headerLine = Papa.unparse([columns.map((c) => c.header)], { header: false });
+  const dataLines = existingRows.map((existing) =>
+    Papa.unparse([columns.map((c) => existing[c.header] ?? "")], { header: false })
+  );
+  const newLine = Papa.unparse([values], { header: false });
+  const fullContent = [headerLine, ...dataLines, newLine].join("\n") + "\n";
+
+  await writeBlobText(csvPathname(tipo), fullContent, "text/csv");
   return lineas;
 }
 
-export function appendInvoice606(record: Invoice606): number {
+export async function appendInvoice606(record: Invoice606): Promise<number> {
   return appendRow("606", record);
 }
 
-export function appendInvoice607(record: Invoice607): number {
+export async function appendInvoice607(record: Invoice607): Promise<number> {
   return appendRow("607", record);
-}
-
-export function ensureExportsDir() {
-  fs.mkdirSync(EXPORTS_DIR, { recursive: true });
 }
