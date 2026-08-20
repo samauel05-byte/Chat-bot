@@ -93,18 +93,32 @@ export function Chat() {
         </div>
       )}
 
-      <header className="flex items-center gap-3 border-b border-black/5 bg-white px-5 py-4 shadow-sm dark:border-white/10 dark:bg-neutral-900">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center">
-          <Image src="/logo.png" alt="Save Consultores, S.R.L." width={56} height={56} priority />
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 bg-white px-5 py-4 shadow-sm dark:border-white/10 dark:bg-neutral-900">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center sm:h-14 sm:w-14">
+            <Image src="/logo.png" alt="Save Consultores, S.R.L." width={56} height={56} priority />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50 sm:text-base">
+              Asistente de facturación 606 / 607
+            </h1>
+            <p className="hidden text-xs text-neutral-500 dark:text-neutral-400 sm:block">
+              Save Consultores, S.R.L. — te ayudo a preparar los reportes de la DGII
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
-            Asistente de facturación 606 / 607
-          </h1>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            Save Consultores, S.R.L. — te ayudo a preparar los reportes de la DGII
-          </p>
-        </div>
+        <button
+          type="button"
+          disabled={isStreaming}
+          onClick={() =>
+            sendMessage({
+              text: "Ya subí todas las facturas que quería escanear por ahora. Genera el reporte (dime si necesitas que te confirme el tipo 606/607 o el período).",
+            })
+          }
+          className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          📊 Generar reporte
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
