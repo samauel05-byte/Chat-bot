@@ -16,14 +16,21 @@ export function Chat() {
   const { messages, sendMessage, stop, status, error } = useChat({ transport });
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<FileList | undefined>(undefined);
+  const [mode, setMode] = useState<"606" | "607" | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isStreaming = status === "streaming" || status === "submitted";
 
+  const MODE_PREFIX: Record<"606" | "607", string> = {
+    "606": "Esta factura es una COMPRA: regístrala como formato 606. ",
+    "607": "Esta factura es una VENTA: regístrala como formato 607. ",
+  };
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!input.trim() && (!files || files.length === 0)) return;
-    sendMessage({ text: input, files });
+    const text = mode ? MODE_PREFIX[mode] + input : input;
+    sendMessage({ text, files });
     setInput("");
     setFiles(undefined);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -89,6 +96,38 @@ export function Chat() {
       </div>
 
       <form onSubmit={handleSubmit} className="border-t border-black/10 p-3 dark:border-white/10">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-xs text-black/50 dark:text-white/50">Leer factura como:</span>
+          <button
+            type="button"
+            onClick={() => setMode((m) => (m === "606" ? null : "606"))}
+            className={
+              "rounded-full border px-3 py-1 text-xs " +
+              (mode === "606"
+                ? "border-blue-600 bg-blue-600 text-white"
+                : "border-black/15 text-black/70 dark:border-white/20 dark:text-white/70")
+            }
+          >
+            Compra (606)
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode((m) => (m === "607" ? null : "607"))}
+            className={
+              "rounded-full border px-3 py-1 text-xs " +
+              (mode === "607"
+                ? "border-blue-600 bg-blue-600 text-white"
+                : "border-black/15 text-black/70 dark:border-white/20 dark:text-white/70")
+            }
+          >
+            Venta (607)
+          </button>
+          {!mode && (
+            <span className="text-xs text-black/40 dark:text-white/40">
+              (sin elegir → el bot lo deduce por el RNC)
+            </span>
+          )}
+        </div>
         {files && files.length > 0 && (
           <div className="mb-2 text-xs text-black/60 dark:text-white/60">
             {files.length} archivo(s) adjunto(s)
