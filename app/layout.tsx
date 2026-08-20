@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chatbot 606/607",
+  title: "Save Consultores — Facturación 606/607",
   description: "Chatbot de facturación DGII — formatos 606 y 607",
 };
 

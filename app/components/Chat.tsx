@@ -1,10 +1,25 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react";
 import type { invoiceChat } from "@/trigger/chat";
 import { mintChatAccessToken, startChatSession } from "@/app/actions/chat";
+
+const TOOL_LABELS: Record<string, string> = {
+  getCompanyConfig: "🔍 Revisando los datos de tu empresa",
+  setCompanyConfig: "🏢 Guardando los datos de tu empresa",
+  recordPurchase606: "🧾 Guardando factura de compra (606)",
+  recordSale607: "🧾 Guardando factura de venta (607)",
+  listRecordedInvoices: "📋 Revisando las facturas guardadas",
+  generateDgiiReport: "📊 Generando tu reporte",
+};
+
+function toolLabel(toolType: string) {
+  const name = toolType.replace("tool-", "");
+  return TOOL_LABELS[name] ?? `⚙ ${name}`;
+}
 
 export function Chat() {
   const transport = useTriggerChatTransport<typeof invoiceChat>({
@@ -21,6 +36,8 @@ export function Chat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isStreaming = status === "streaming" || status === "submitted";
+  const lastMessage = messages[messages.length - 1];
+  const showTypingIndicator = isStreaming && lastMessage?.role !== "assistant";
 
   const MODE_PREFIX: Record<"606" | "607", string> = {
     "606": "Esta factura es una COMPRA: regístrala como formato 606. ",
@@ -32,6 +49,11 @@ export function Chat() {
     if (existing) for (const f of Array.from(existing)) dt.items.add(f);
     for (const f of Array.from(incoming)) dt.items.add(f);
     return dt.files;
+  }
+
+  function clearFiles() {
+    setFiles(undefined);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -48,13 +70,12 @@ export function Chat() {
     const text = mode ? MODE_PREFIX[mode] + input : input;
     sendMessage({ text, files });
     setInput("");
-    setFiles(undefined);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    clearFiles();
   }
 
   return (
     <div
-      className="relative flex h-dvh flex-col"
+      className="relative flex h-dvh flex-col bg-slate-50 dark:bg-neutral-950"
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragging(true);
@@ -65,34 +86,41 @@ export function Chat() {
       onDrop={handleDrop}
     >
       {isDragging && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center border-4 border-dashed border-blue-500 bg-blue-500/10">
-          <p className="rounded bg-blue-600 px-4 py-2 text-sm text-white">
-            Suelta las facturas aquí (puedes soltar varias a la vez)
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center border-4 border-dashed border-indigo-500 bg-indigo-500/10 backdrop-blur-sm">
+          <p className="rounded-xl bg-indigo-600 px-6 py-3 text-base font-medium text-white shadow-lg">
+            📥 Suelta tus facturas aquí — puedes soltar varias a la vez
           </p>
         </div>
       )}
-      <header className="border-b border-black/10 px-4 py-3 dark:border-white/10">
-        <h1 className="text-sm font-medium">Chatbot de facturación 606 / 607</h1>
+
+      <header className="flex items-center gap-3 border-b border-black/5 bg-white px-5 py-4 shadow-sm dark:border-white/10 dark:bg-neutral-900">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center">
+          <Image src="/logo.png" alt="Save Consultores, S.R.L." width={56} height={56} priority />
+        </div>
+        <div>
+          <h1 className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
+            Asistente de facturación 606 / 607
+          </h1>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            Save Consultores, S.R.L. — te ayudo a preparar los reportes de la DGII
+          </p>
+        </div>
       </header>
 
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        {messages.length === 0 && (
-          <p className="text-sm text-black/50 dark:text-white/50">
-            Cuéntame el RNC de tu empresa para empezar, o adjunta directamente una factura.
-          </p>
-        )}
-        {messages.map((message) => (
-          <div key={message.id} className={message.role === "user" ? "text-right" : "text-left"}>
-            <div
-              className={
-                "inline-block max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap " +
-                (message.role === "user"
-                  ? "bg-blue-600 text-white"
-                  : "bg-black/5 dark:bg-white/10")
-              }
-            >
+      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+        {messages.length === 0 && <WelcomeCard />}
+
+        <div className="mx-auto flex max-w-2xl flex-col gap-5">
+          {messages.map((message) => (
+            <MessageBubble key={message.id} role={message.role}>
               {message.parts.map((part, i) => {
-                if (part.type === "text") return <span key={i}>{part.text}</span>;
+                if (part.type === "text") {
+                  return (
+                    <span key={i} className="whitespace-pre-wrap">
+                      {part.text}
+                    </span>
+                  );
+                }
                 if (part.type === "file" && part.mediaType?.startsWith("image/")) {
                   return (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -100,121 +128,224 @@ export function Chat() {
                       key={i}
                       src={part.url}
                       alt={part.filename ?? "adjunto"}
-                      className="mt-2 max-h-48 rounded"
+                      className="mt-2 max-h-56 rounded-lg border border-black/10 object-cover dark:border-white/10"
                     />
                   );
                 }
                 if (part.type === "file") {
                   return (
-                    <div key={i} className="mt-2 text-xs opacity-70">
+                    <div
+                      key={i}
+                      className="mt-2 flex items-center gap-1.5 text-xs opacity-80"
+                    >
                       📎 {part.filename ?? "archivo adjunto"}
                     </div>
                   );
                 }
-                if (part.type.startsWith("tool-")) {
+                if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
+                  const done =
+                    "state" in part && (part as { state?: string }).state === "output-available";
                   return (
-                    <div key={i} className="mt-2 text-xs opacity-60">
-                      ⚙ {part.type.replace("tool-", "")}
+                    <div
+                      key={i}
+                      className="mt-2 flex items-center gap-1.5 rounded-full bg-black/5 px-2.5 py-1 text-xs text-neutral-600 dark:bg-white/10 dark:text-neutral-300"
+                    >
+                      {done ? (
+                        <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+                      ) : (
+                        <span className="animate-pulse">⏳</span>
+                      )}
+                      {toolLabel(part.type)}
                     </div>
                   );
                 }
                 return null;
               })}
-            </div>
-          </div>
-        ))}
-        {error && (
-          <p className="text-sm text-red-600 dark:text-red-400">{error.message}</p>
-        )}
+            </MessageBubble>
+          ))}
+
+          {showTypingIndicator && (
+            <MessageBubble role="assistant">
+              <span className="inline-flex gap-1">
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
+              </span>
+            </MessageBubble>
+          )}
+
+          {error && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400">
+              ⚠️ {error.message}
+            </p>
+          )}
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-black/10 p-3 dark:border-white/10">
-        <div className="mb-2 flex items-center gap-2">
-          <span className="text-xs text-black/50 dark:text-white/50">Leer factura como:</span>
-          <button
-            type="button"
-            onClick={() => setMode((m) => (m === "606" ? null : "606"))}
-            className={
-              "rounded-full border px-3 py-1 text-xs " +
-              (mode === "606"
-                ? "border-blue-600 bg-blue-600 text-white"
-                : "border-black/15 text-black/70 dark:border-white/20 dark:text-white/70")
-            }
-          >
-            Compra (606)
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode((m) => (m === "607" ? null : "607"))}
-            className={
-              "rounded-full border px-3 py-1 text-xs " +
-              (mode === "607"
-                ? "border-blue-600 bg-blue-600 text-white"
-                : "border-black/15 text-black/70 dark:border-white/20 dark:text-white/70")
-            }
-          >
-            Venta (607)
-          </button>
-          {!mode && (
-            <span className="text-xs text-black/40 dark:text-white/40">
-              (sin elegir → el bot lo deduce por el RNC)
-            </span>
-          )}
-        </div>
-        {files && files.length > 0 && (
-          <div className="mb-2 flex items-start gap-2 text-xs text-black/60 dark:text-white/60">
-            <span className="shrink-0 font-medium">{files.length} archivo(s):</span>
-            <span className="truncate">
-              {Array.from(files)
-                .slice(0, 4)
-                .map((f) => f.name)
-                .join(", ")}
-              {files.length > 4 ? ` +${files.length - 4} más` : ""}
+      <form
+        onSubmit={handleSubmit}
+        className="border-t border-black/5 bg-white px-4 py-3 shadow-[0_-1px_8px_rgba(0,0,0,0.03)] dark:border-white/10 dark:bg-neutral-900 sm:px-8"
+      >
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-2.5 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+              Leer factura como:
             </span>
             <button
               type="button"
-              onClick={() => {
-                setFiles(undefined);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-              }}
-              className="shrink-0 text-red-600 underline dark:text-red-400"
+              onClick={() => setMode((m) => (m === "606" ? null : "606"))}
+              className={
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
+                (mode === "606"
+                  ? "border-sky-600 bg-sky-600 text-white"
+                  : "border-black/10 text-neutral-600 hover:border-sky-300 dark:border-white/15 dark:text-neutral-300")
+              }
             >
-              Quitar todos
+              🛒 Compra (606)
             </button>
+            <button
+              type="button"
+              onClick={() => setMode((m) => (m === "607" ? null : "607"))}
+              className={
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
+                (mode === "607"
+                  ? "border-emerald-600 bg-emerald-600 text-white"
+                  : "border-black/10 text-neutral-600 hover:border-emerald-300 dark:border-white/15 dark:text-neutral-300")
+              }
+            >
+              💰 Venta (607)
+            </button>
+            {!mode && (
+              <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                (si no eliges, lo deduzco por el RNC)
+              </span>
+            )}
           </div>
-        )}
-        <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,application/pdf"
-            multiple
-            onChange={(e) =>
-              setFiles((prev) => (e.target.files ? mergeFiles(prev, e.target.files) : prev))
-            }
-            className="text-xs"
-          />
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Escribe un mensaje..."
-            className="flex-1 rounded border border-black/15 px-3 py-2 text-sm dark:border-white/15 dark:bg-transparent"
-          />
-          {isStreaming ? (
-            <button
-              type="button"
-              onClick={stop}
-              className="rounded bg-red-600 px-3 py-2 text-sm text-white"
-            >
-              Detener
-            </button>
-          ) : (
-            <button type="submit" className="rounded bg-blue-600 px-3 py-2 text-sm text-white">
-              Enviar
-            </button>
+
+          {files && files.length > 0 && (
+            <div className="mb-2.5 flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
+              <span className="shrink-0">📎</span>
+              <span className="shrink-0 font-medium">{files.length} archivo(s):</span>
+              <span className="truncate">
+                {Array.from(files)
+                  .slice(0, 4)
+                  .map((f) => f.name)
+                  .join(", ")}
+                {files.length > 4 ? ` +${files.length - 4} más` : ""}
+              </span>
+              <button
+                type="button"
+                onClick={clearFiles}
+                className="ml-auto shrink-0 font-medium text-red-600 hover:underline dark:text-red-400"
+              >
+                Quitar todos
+              </button>
+            </div>
           )}
+
+          <div className="flex items-center gap-2">
+            <label className="flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-black/15 p-2.5 text-lg transition-colors hover:border-indigo-400 hover:bg-indigo-50 dark:border-white/20 dark:hover:bg-indigo-950/30">
+              📎
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                onChange={(e) =>
+                  setFiles((prev) => (e.target.files ? mergeFiles(prev, e.target.files) : prev))
+                }
+                className="hidden"
+              />
+            </label>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Escribe un mensaje o arrastra una factura aquí..."
+              className="flex-1 rounded-full border border-black/10 bg-neutral-50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-indigo-400 focus:bg-white dark:border-white/15 dark:bg-neutral-800 dark:focus:bg-neutral-800"
+            />
+            {isStreaming ? (
+              <button
+                type="button"
+                onClick={stop}
+                className="shrink-0 rounded-full bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700"
+              >
+                ■ Detener
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="shrink-0 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+              >
+                Enviar ➤
+              </button>
+            )}
+          </div>
         </div>
       </form>
+    </div>
+  );
+}
+
+function MessageBubble({
+  role,
+  children,
+}: {
+  role: "user" | "assistant" | "system";
+  children: React.ReactNode;
+}) {
+  const isUser = role === "user";
+  return (
+    <div className={"flex items-end gap-2 " + (isUser ? "flex-row-reverse" : "flex-row")}>
+      <div
+        className={
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm " +
+          (isUser
+            ? "bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900"
+            : "bg-indigo-600 text-white")
+        }
+      >
+        {isUser ? "🙂" : "🤖"}
+      </div>
+      <div
+        className={
+          "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm " +
+          (isUser
+            ? "rounded-br-sm bg-indigo-600 text-white"
+            : "rounded-bl-sm bg-white text-neutral-800 dark:bg-neutral-800 dark:text-neutral-100")
+        }
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function WelcomeCard() {
+  const steps = [
+    { icon: "🏢", text: "Cuéntame el RNC y el nombre de tu empresa" },
+    { icon: "📸", text: "Sube la foto o el PDF de una factura (o varias a la vez)" },
+    { icon: "✅", text: "Revisa lo que extraje y confírmalo" },
+    { icon: "📊", text: "Pídeme el reporte del mes cuando lo necesites" },
+  ];
+  return (
+    <div className="mx-auto mb-6 max-w-md rounded-2xl border border-black/5 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-neutral-900">
+      <div className="mb-2 text-3xl">👋</div>
+      <h2 className="mb-1 text-base font-semibold text-neutral-900 dark:text-neutral-50">
+        ¡Hola! Vamos a preparar tus 606 y 607
+      </h2>
+      <p className="mb-5 text-sm text-neutral-500 dark:text-neutral-400">
+        Así de simple funciona:
+      </p>
+      <ul className="space-y-3 text-left">
+        {steps.map((step, i) => (
+          <li key={i} className="flex items-center gap-3 text-sm text-neutral-700 dark:text-neutral-300">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-base dark:bg-indigo-950/40">
+              {step.icon}
+            </span>
+            {step.text}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
