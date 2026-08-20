@@ -34,6 +34,7 @@ export function Chat() {
   const [mode, setMode] = useState<"606" | "607" | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const isStreaming = status === "streaming" || status === "submitted";
   const lastMessage = messages[messages.length - 1];
@@ -54,6 +55,7 @@ export function Chat() {
   function clearFiles() {
     setFiles(undefined);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -258,13 +260,32 @@ export function Chat() {
           )}
 
           <div className="flex items-center gap-2">
-            <label className="flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-black/15 p-2.5 text-lg transition-colors hover:border-indigo-400 hover:bg-indigo-50 dark:border-white/20 dark:hover:bg-indigo-950/30">
+            <label
+              title="Elegir archivo"
+              className="flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-black/15 p-2.5 text-lg transition-colors hover:border-indigo-400 hover:bg-indigo-50 dark:border-white/20 dark:hover:bg-indigo-950/30"
+            >
               📎
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*,application/pdf"
                 multiple
+                onChange={(e) =>
+                  setFiles((prev) => (e.target.files ? mergeFiles(prev, e.target.files) : prev))
+                }
+                className="hidden"
+              />
+            </label>
+            <label
+              title="Tomar foto con la cámara"
+              className="flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-black/15 p-2.5 text-lg transition-colors hover:border-indigo-400 hover:bg-indigo-50 dark:border-white/20 dark:hover:bg-indigo-950/30"
+            >
+              📷
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
                 onChange={(e) =>
                   setFiles((prev) => (e.target.files ? mergeFiles(prev, e.target.files) : prev))
                 }
