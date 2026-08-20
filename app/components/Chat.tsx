@@ -17,6 +17,7 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<FileList | undefined>(undefined);
   const [mode, setMode] = useState<"606" | "607" | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isStreaming = status === "streaming" || status === "submitted";
@@ -25,6 +26,21 @@ export function Chat() {
     "606": "Esta factura es una COMPRA: regístrala como formato 606. ",
     "607": "Esta factura es una VENTA: regístrala como formato 607. ",
   };
+
+  function mergeFiles(existing: FileList | undefined, incoming: FileList | File[]): FileList {
+    const dt = new DataTransfer();
+    if (existing) for (const f of Array.from(existing)) dt.items.add(f);
+    for (const f of Array.from(incoming)) dt.items.add(f);
+    return dt.files;
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setFiles((prev) => mergeFiles(prev, e.dataTransfer.files));
+    }
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +53,24 @@ export function Chat() {
   }
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div
+      className="relative flex h-dvh flex-col"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setIsDragging(false);
+      }}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center border-4 border-dashed border-blue-500 bg-blue-500/10">
+          <p className="rounded bg-blue-600 px-4 py-2 text-sm text-white">
+            Suelta las facturas aquí (puedes soltar varias a la vez)
+          </p>
+        </div>
+      )}
       <header className="border-b border-black/10 px-4 py-3 dark:border-white/10">
         <h1 className="text-sm font-medium">Chatbot de facturación 606 / 607</h1>
       </header>
@@ -129,8 +162,25 @@ export function Chat() {
           )}
         </div>
         {files && files.length > 0 && (
-          <div className="mb-2 text-xs text-black/60 dark:text-white/60">
-            {files.length} archivo(s) adjunto(s)
+          <div className="mb-2 flex items-start gap-2 text-xs text-black/60 dark:text-white/60">
+            <span className="shrink-0 font-medium">{files.length} archivo(s):</span>
+            <span className="truncate">
+              {Array.from(files)
+                .slice(0, 4)
+                .map((f) => f.name)
+                .join(", ")}
+              {files.length > 4 ? ` +${files.length - 4} más` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setFiles(undefined);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              className="shrink-0 text-red-600 underline dark:text-red-400"
+            >
+              Quitar todos
+            </button>
           </div>
         )}
         <div className="flex items-center gap-2">
@@ -139,7 +189,9 @@ export function Chat() {
             type="file"
             accept="image/*,application/pdf"
             multiple
-            onChange={(e) => setFiles(e.target.files ?? undefined)}
+            onChange={(e) =>
+              setFiles((prev) => (e.target.files ? mergeFiles(prev, e.target.files) : prev))
+            }
             className="text-xs"
           />
           <input

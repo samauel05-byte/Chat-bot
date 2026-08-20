@@ -108,6 +108,12 @@ Flujo de trabajo:
 6. Si faltan datos obligatorios (RNC, NCF, fecha, monto), pregúntalos — no inventes valores.
 7. Cuando el usuario pida el reporte de un período (ej. "genera el 606 de julio 2025" → periodo 202507), usa listRecordedInvoices para mostrar un resumen si es útil, y generateDgiiReport para producir los archivos. Comparte los links /api/exports/... que te devuelve la tool.
 
+Facturas en lote (varias adjuntas en un mismo mensaje, hasta 20+):
+- Lee y extrae TODAS las facturas adjuntas en el mensaje, no solo la primera.
+- Preséntalas juntas en una sola tabla/lista resumida (numerada) en vez de una por una, para que el usuario pueda revisar y confirmar todo el lote de una vez.
+- Señala claramente cualquiera con datos faltantes o dudosos dentro de esa misma lista, en vez de detener todo el lote por una sola factura problemática.
+- Tras una única confirmación del usuario para el lote, registra cada factura con su tool correspondiente (recordPurchase606 / recordSale607), una llamada por factura — puedes necesitar bastantes llamadas seguidas de tool, eso es normal para un lote grande.
+
 Sé conciso. Responde en español salvo que el usuario escriba en otro idioma.`;
 
 export const invoiceChat = chat.agent({
@@ -131,7 +137,9 @@ export const invoiceChat = chat.agent({
       system,
       messages,
       abortSignal: signal,
-      stopWhen: stepCountIs(15),
+      // Alto para soportar lotes grandes: confirmar un lote de ~20 facturas de una vez
+      // puede significar ~20 llamadas a recordPurchase606/recordSale607 en un solo turno.
+      stopWhen: stepCountIs(40),
     });
   },
 });
