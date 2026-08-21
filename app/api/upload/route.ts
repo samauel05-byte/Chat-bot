@@ -13,12 +13,16 @@ export async function POST(req: NextRequest) {
     }
 
     const blob = await put(`uploads/${file.name}`, file, {
-      access: "public",
+      access: "private",
       addRandomSuffix: true,
       contentType: file.type || "application/octet-stream",
     });
 
-    return NextResponse.json({ url: blob.url, contentType: file.type, name: file.name });
+    // Build a proxy URL so the agent can fetch the private blob via our own route
+    const origin = new URL(req.url).origin;
+    const proxyUrl = `${origin}/api/invoice/${blob.pathname}`;
+
+    return NextResponse.json({ url: proxyUrl, contentType: file.type, name: file.name });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[upload] error:", message);
