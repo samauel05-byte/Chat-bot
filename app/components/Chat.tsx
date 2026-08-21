@@ -33,6 +33,7 @@ export function Chat() {
   const [files, setFiles] = useState<FileList | undefined>(undefined);
   const [mode, setMode] = useState<"606" | "607" | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -66,11 +67,41 @@ export function Chat() {
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isUploading || isStreaming) return;
     if (!input.trim() && (!files || files.length === 0)) return;
-    const text = mode ? MODE_PREFIX[mode] + input : input;
-    sendMessage({ text, files });
+
+    const baseText = mode ? MODE_PREFIX[mode] + input : input;
+
+    if (files && files.length > 0) {
+      setIsUploading(true);
+      try {
+        const uploaded = await Promise.all(
+          Array.from(files).map(async (file) => {
+            const fd = new FormData();
+            fd.append("file", file);
+            const res = await fetch("/api/upload", { method: "POST", body: fd });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error((err as { error?: string }).error ?? "Error subiendo archivo");
+            }
+            return res.json() as Promise<{ url: string; contentType: string; name: string }>;
+          })
+        );
+        // Encode file URLs as a hidden marker; the agent parses this in trigger/chat.ts
+        const marker = `\n\n[FACTURAS:${JSON.stringify(uploaded)}]`;
+        sendMessage({ text: baseText + marker });
+      } catch (err) {
+        console.error("Upload error:", err);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
+    } else {
+      sendMessage({ text: baseText });
+    }
+
     setInput("");
     clearFiles();
   }
@@ -309,9 +340,10 @@ export function Chat() {
             ) : (
               <button
                 type="submit"
-                className="shrink-0 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                disabled={isUploading}
+                className="shrink-0 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
               >
-                Enviar ➤
+                {isUploading ? "⏳ Subiendo…" : "Enviar ➤"}
               </button>
             )}
           </div>

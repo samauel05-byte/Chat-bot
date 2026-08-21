@@ -1,5 +1,5 @@
 import { chat } from "@trigger.dev/sdk/ai";
-import { streamText, stepCountIs, tool } from "ai";
+import { streamText, stepCountIs, tool, type ModelMessage, type UserModelMessage, type TextPart } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 
@@ -94,6 +94,44 @@ const tools = {
   }),
 };
 
+type FileMeta = { url: string; contentType: string; name: string };
+
+function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
+  return messages.map((msg) => {
+    if (msg.role !== "user") return msg;
+
+    const rawText =
+      typeof msg.content === "string"
+        ? msg.content
+        : (msg.content.find((p: TextPart | unknown) => (p as TextPart).type === "text") as TextPart | undefined)?.text ?? "";
+
+    const markerMatch = rawText.match(/\[FACTURAS:([\s\S]*?)\]$/m);
+    if (!markerMatch) return msg;
+
+    let files: FileMeta[] = [];
+    try {
+      files = JSON.parse(markerMatch[1]);
+    } catch {
+      return msg;
+    }
+
+    const cleanText = rawText.replace(/\s*\[FACTURAS:[\s\S]*?\]$/, "").trim();
+
+    const content: UserModelMessage["content"] = [];
+    if (cleanText) content.push({ type: "text", text: cleanText });
+
+    for (const f of files) {
+      if (f.contentType.startsWith("image/")) {
+        content.push({ type: "image", image: new URL(f.url) });
+      } else {
+        content.push({ type: "file", data: new URL(f.url), mediaType: f.contentType as `application/${string}` });
+      }
+    }
+
+    return { ...msg, content } as UserModelMessage;
+  });
+}
+
 const SYSTEM_PROMPT_BASE = `Eres un asistente que ayuda a preparar los formatos 606 (Compras de Bienes y Servicios) y 607 (Ventas de Bienes y Servicios) para la DGII (República Dominicana), a partir de facturas que el usuario adjunta como imagen o PDF en el chat.
 
 Flujo de trabajo:
@@ -136,10 +174,8 @@ export const invoiceChat = chat.agent({
       ...chat.toStreamTextOptions({ tools: runTools }),
       model: anthropic(MODEL),
       system,
-      messages,
+      messages: preprocessMessages(messages),
       abortSignal: signal,
-      // Alto para soportar lotes grandes: confirmar un lote de ~20 facturas de una vez
-      // puede significar ~20 llamadas a recordPurchase606/recordSale607 en un solo turno.
       stopWhen: stepCountIs(40),
     });
   },
