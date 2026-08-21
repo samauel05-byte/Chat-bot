@@ -35,6 +35,7 @@ export function Chat() {
   const [mode, setMode] = useState<"606" | "607" | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -70,12 +71,20 @@ export function Chat() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setSubmitError(null);
     if (isUploading || isStreaming) return;
-    if (!input.trim() && (!files || files.length === 0)) return;
+
+    const hasFiles = files && files.length > 0;
+    const hasText = !!input.trim();
+
+    if (!hasText && !hasFiles) {
+      setSubmitError("Adjunta al menos una factura antes de enviar.");
+      return;
+    }
 
     const baseText = mode ? MODE_PREFIX[mode] + input : input;
 
-    if (files && files.length > 0) {
+    if (hasFiles) {
       setIsUploading(true);
       try {
         const uploaded = await Promise.all(
@@ -90,10 +99,11 @@ export function Chat() {
             return res.json() as Promise<{ url: string; contentType: string; name: string }>;
           })
         );
-        // Encode file URLs as a hidden marker; the agent parses this in trigger/chat.ts
         const marker = `\n\n[FACTURAS:${JSON.stringify(uploaded)}]`;
         sendMessage({ text: baseText + marker });
       } catch (err) {
+        const msg = err instanceof Error ? err.message : "Error subiendo el archivo";
+        setSubmitError(msg);
         console.error("Upload error:", err);
         return;
       } finally {
@@ -312,6 +322,12 @@ export function Chat() {
                 Quitar todos
               </button>
             </div>
+          )}
+
+          {submitError && (
+            <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-400">
+              ⚠️ {submitError}
+            </p>
           )}
 
           <div className="flex items-center gap-2">
