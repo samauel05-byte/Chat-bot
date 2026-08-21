@@ -8,8 +8,6 @@ import { invoice607Schema } from "@/lib/dgii/schema607";
 import {
   appendInvoice606,
   appendInvoice607,
-  getCompanyConfig,
-  setCompanyConfig,
   listInvoices,
 } from "@/lib/dgii/store";
 import { generateReport } from "@/lib/dgii/generateReport";
@@ -17,29 +15,6 @@ import { generateReport } from "@/lib/dgii/generateReport";
 const MODEL = "claude-haiku-4-5-20251001";
 
 const tools = {
-  getCompanyConfig: tool({
-    description:
-      "Obtiene el RNC y nombre de la empresa configurados. Llama esto al inicio de la conversación si no sabes el RNC de la empresa todavía.",
-    inputSchema: z.object({}),
-    execute: async () => {
-      const config = await getCompanyConfig();
-      return config ?? { message: "No hay empresa configurada todavía." };
-    },
-  }),
-
-  setCompanyConfig: tool({
-    description:
-      "Guarda el RNC y nombre de la empresa del usuario. Solo se necesita una vez; úsalo cuando el usuario te dé su RNC por primera vez.",
-    inputSchema: z.object({
-      rnc: z.string().regex(/^\d{9}$/, "El RNC debe tener 9 dígitos"),
-      nombre: z.string().min(1),
-    }),
-    execute: async ({ rnc, nombre }) => {
-      await setCompanyConfig({ rnc, nombre });
-      return { ok: true };
-    },
-  }),
-
   recordPurchase606: tool({
     description:
       "Registra una factura de COMPRA (formato 606) ya confirmada por el usuario. Solo llama esto después de mostrarle los datos extraídos y que el usuario los confirme explícitamente.",
@@ -152,7 +127,7 @@ REGLAS PRINCIPALES — síguelas en este orden exacto:
    a. Recorre TODOS los mensajes de esta sesión y recolecta cada factura extraída que aún no haya sido guardada.
    b. Para cada factura 606 pendiente llama a recordPurchase606. Para cada 607 llama a recordSale607. (Puedes hacer muchas llamadas seguidas — es normal.)
    c. Luego llama a generateDgiiReport para el período indicado (si no se indica, usa el mes actual en formato YYYYMM).
-   d. Comparte los links /api/exports/... que devuelve la tool para descargar el Excel y el TXT.
+   d. Comparte los links como markdown clicable: [Descargar Excel](/api/exports/606_YYYYMM.xlsx) y [Descargar TXT](/api/exports/606_YYYYMM.txt).
 6. Si el usuario menciona un período específico (ej. "julio 2025" → 202507), úsalo. Si no, usa el mes actual.
 
 No hagas comentarios ni preámbulos. Solo extrae, muestra la tabla, o guarda y genera — según el paso en que estés.
@@ -168,10 +143,7 @@ export const invoiceChat = chat.agent({
     },
   },
   run: async ({ messages, tools: runTools, signal }) => {
-    const config = await getCompanyConfig();
-    const system = config
-      ? `${SYSTEM_PROMPT_BASE}\n\nEmpresa configurada: RNC ${config.rnc}, ${config.nombre}.`
-      : `${SYSTEM_PROMPT_BASE}\n\nTodavía no hay empresa configurada. NO se lo preguntes al usuario directamente — detéctala de la primera factura que suba, como se explica en el paso 3.`;
+    const system = SYSTEM_PROMPT_BASE;
 
     return streamText({
       ...chat.toStreamTextOptions({ tools: runTools }),

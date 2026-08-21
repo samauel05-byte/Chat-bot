@@ -6,6 +6,7 @@ import { useChat } from "@ai-sdk/react";
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react";
 import type { invoiceChat } from "@/trigger/chat";
 import { mintChatAccessToken, startChatSession } from "@/app/actions/chat";
+import Markdown from "react-markdown";
 
 const TOOL_LABELS: Record<string, string> = {
   getCompanyConfig: "🔍 Revisando los datos de tu empresa",
@@ -163,6 +164,28 @@ export function Chat() {
               {message.parts.map((part, i) => {
                 if (part.type === "text") {
                   const displayText = part.text.replace(/\s*\[FACTURAS:[\s\S]*?\]$/, "").trim();
+                  if (message.role === "assistant") {
+                    return (
+                      <div key={i} className="prose prose-sm dark:prose-invert max-w-none">
+                        <Markdown
+                          components={{
+                            a: ({ href, children }) => (
+                              <a
+                                href={href}
+                                className="font-medium text-indigo-600 underline hover:text-indigo-800 dark:text-indigo-400"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                {children}
+                              </a>
+                            ),
+                          }}
+                        >
+                          {displayText}
+                        </Markdown>
+                      </div>
+                    );
+                  }
                   return (
                     <span key={i} className="whitespace-pre-wrap">
                       {displayText}
