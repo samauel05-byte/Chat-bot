@@ -145,7 +145,7 @@ export function Chat() {
           disabled={isStreaming}
           onClick={() =>
             sendMessage({
-              text: "Ya subí todas las facturas que quería escanear por ahora. Genera el reporte (dime si necesitas que te confirme el tipo 606/607 o el período).",
+              text: "Genera el reporte del mes actual para 606 y 607.",
             })
           }
           className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -162,9 +162,10 @@ export function Chat() {
             <MessageBubble key={message.id} role={message.role}>
               {message.parts.map((part, i) => {
                 if (part.type === "text") {
+                  const displayText = part.text.replace(/\s*\[FACTURAS:[\s\S]*?\]$/, "").trim();
                   return (
                     <span key={i} className="whitespace-pre-wrap">
-                      {part.text}
+                      {displayText}
                     </span>
                   );
                 }
@@ -389,19 +390,19 @@ function MessageBubble({
 
 function WelcomeCard() {
   const steps = [
-    { icon: "📸", text: "Sube la foto o el PDF de una factura (o varias a la vez)" },
-    { icon: "🏢", text: "Detecto el RNC y el nombre de tu empresa solo — no hace falta que los escribas" },
-    { icon: "✅", text: "Revisa lo que extraje y confírmalo" },
-    { icon: "📊", text: "Pídeme el reporte del mes cuando lo necesites" },
+    { icon: "1️⃣", text: "Selecciona el tipo: Compra (606) o Venta (607)" },
+    { icon: "📎", text: "Adjunta las fotos o PDFs de las facturas (hasta 20 a la vez)" },
+    { icon: "⚡", text: "El sistema las lee y las registra automáticamente — sin preguntas" },
+    { icon: "📊", text: "Cuando quieras el reporte, presiona «Generar reporte»" },
   ];
   return (
     <div className="mx-auto mb-6 max-w-md rounded-2xl border border-black/5 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-neutral-900">
       <div className="mb-2 text-3xl">👋</div>
       <h2 className="mb-1 text-base font-semibold text-neutral-900 dark:text-neutral-50">
-        ¡Hola! Vamos a preparar tus 606 y 607
+        Procesamiento de facturas 606 / 607
       </h2>
       <p className="mb-5 text-sm text-neutral-500 dark:text-neutral-400">
-        Así de simple funciona:
+        Simple y directo — sin confirmaciones:
       </p>
       <ul className="space-y-3 text-left">
         {steps.map((step, i) => (
