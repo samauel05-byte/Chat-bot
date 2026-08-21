@@ -288,7 +288,7 @@ export function Chat() {
             </button>
             {!mode && (
               <span className="text-xs text-neutral-400 dark:text-neutral-500">
-                (si no eliges, lo deduzco por el RNC)
+                (si no eliges, se asume Compra 606)
               </span>
             )}
           </div>
