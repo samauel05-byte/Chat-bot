@@ -18,6 +18,7 @@ export const TIPO_INGRESO_607 = {
 const tipoIngresoCodes = Object.keys(TIPO_INGRESO_607) as [string, ...string[]];
 
 export const invoice607Schema = z.object({
+  cliente: z.string().optional().describe("Nombre del cliente/receptor de la factura"),
   rncCedulaPasaporte: z
     .string()
     .regex(/^\d{9}$|^\d{11}$/, "RNC (9 dígitos) o Cédula (11 dígitos) del cliente")
@@ -26,8 +27,10 @@ export const invoice607Schema = z.object({
   ncf: z.string().min(8).max(19),
   ncfModificado: z.string().max(19).optional(),
   tipoIngreso: z.enum(tipoIngresoCodes),
-  fechaComprobante: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD"),
-  fechaRetencion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD").optional(),
+  fechaComprobante: z.string().regex(/^\d{6}$/, "YYYYMM — solo año y mes, ej: 202604"),
+  diaComprobante: z.string().regex(/^\d{2}$/, "DD — solo el día, ej: 14"),
+  fechaRetencion: z.string().regex(/^\d{6}$/, "YYYYMM").optional(),
+  diaRetencion: z.string().regex(/^\d{2}$/, "DD").optional(),
   montoFacturado: z.number().nonnegative(),
   itbisFacturado: z.number().nonnegative().default(0),
   itbisRetenidoTerceros: z.number().nonnegative().default(0),
@@ -51,13 +54,16 @@ export type Invoice607 = z.infer<typeof invoice607Schema>;
 /** Orden y encabezados oficiales de columna, tal cual el .xls de la DGII. */
 export const COLUMNS_607: { key: keyof Invoice607 | "lineas" | "estatus"; header: string }[] = [
   { key: "lineas", header: "No" },
+  { key: "cliente", header: "Cliente" },
   { key: "rncCedulaPasaporte", header: "RNC/Cédula o Pasaporte" },
   { key: "tipoId", header: "Tipo Identificación" },
   { key: "ncf", header: "Número Comprobante Fiscal" },
   { key: "ncfModificado", header: "Número Comprobante Fiscal Modificado" },
   { key: "tipoIngreso", header: "Tipo de Ingreso" },
   { key: "fechaComprobante", header: "Fecha Comprobante" },
+  { key: "diaComprobante", header: "Dia Comprobante" },
   { key: "fechaRetencion", header: "Fecha de Retención" },
+  { key: "diaRetencion", header: "Dia de Retención" },
   { key: "montoFacturado", header: "Monto Facturado" },
   { key: "itbisFacturado", header: "ITBIS Facturado" },
   { key: "itbisRetenidoTerceros", header: "ITBIS Retenido por Terceros" },

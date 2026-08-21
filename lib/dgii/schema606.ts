@@ -50,6 +50,7 @@ const tipoRetencionIsrCodes = Object.keys(TIPO_RETENCION_ISR_606) as [string, ..
 const formaPagoCodes = Object.keys(FORMA_PAGO_606) as [string, ...string[]];
 
 export const invoice606Schema = z.object({
+  proveedor: z.string().optional().describe("Nombre del proveedor/emisor de la factura"),
   rncCedula: z
     .string()
     .regex(/^\d{9}$|^\d{11}$/, "RNC (9 dígitos) o Cédula (11 dígitos) del proveedor"),
@@ -57,8 +58,10 @@ export const invoice606Schema = z.object({
   tipoBienesServicios: z.enum(tipoBienesServiciosCodes),
   ncf: z.string().min(8).max(19),
   ncfModificado: z.string().max(19).optional(),
-  fechaComprobante: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD"),
-  fechaPago: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD").optional(),
+  fechaComprobante: z.string().regex(/^\d{6}$/, "YYYYMM — solo año y mes, ej: 202604"),
+  diaComprobante: z.string().regex(/^\d{2}$/, "DD — solo el día, ej: 14"),
+  fechaPago: z.string().regex(/^\d{6}$/, "YYYYMM").optional(),
+  diaPago: z.string().regex(/^\d{2}$/, "DD").optional(),
   montoFacturadoServicios: z.number().nonnegative().default(0),
   montoFacturadoBienes: z.number().nonnegative().default(0),
   totalMontoFacturado: z.number().nonnegative(),
@@ -82,13 +85,16 @@ export type Invoice606 = z.infer<typeof invoice606Schema>;
 /** Orden y encabezados oficiales de columna, tal cual el .xls de la DGII. */
 export const COLUMNS_606: { key: keyof Invoice606 | "lineas" | "estatus"; header: string }[] = [
   { key: "lineas", header: "Líneas" },
+  { key: "proveedor", header: "Proveedor" },
   { key: "rncCedula", header: "RNC o Cédula" },
   { key: "tipoId", header: "Tipo Id" },
   { key: "tipoBienesServicios", header: "Tipo Bienes y Servicios Comprados" },
   { key: "ncf", header: "NCF" },
   { key: "ncfModificado", header: "NCF ó Documento Modificado" },
   { key: "fechaComprobante", header: "Fecha Comprobante" },
+  { key: "diaComprobante", header: "Dia Comprobante" },
   { key: "fechaPago", header: "Fecha Pago" },
+  { key: "diaPago", header: "Dia Pago" },
   { key: "montoFacturadoServicios", header: "Monto Facturado en Servicios" },
   { key: "montoFacturadoBienes", header: "Monto Facturado en Bienes" },
   { key: "totalMontoFacturado", header: "Total Monto Facturado" },

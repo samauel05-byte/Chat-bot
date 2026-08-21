@@ -9,12 +9,6 @@ const COLUMNS: Record<Tipo, { key: string; header: string }[]> = {
   "607": COLUMNS_607,
 };
 
-const DATE_HEADERS = new Set(["Fecha Comprobante", "Fecha Pago", "Fecha de Retención"]);
-
-function toDgiiDate(value: string): string {
-  return value ? value.replace(/-/g, "") : "";
-}
-
 export type GenerateReportResult = {
   periodo: string;
   tipo: Tipo;
@@ -47,14 +41,11 @@ export async function generateReport(tipo: Tipo, periodo: string): Promise<Gener
   sheet.getRow(1).font = { bold: true };
   const xlsxBuffer = await workbook.xlsx.writeBuffer();
 
-  const txtColumns = columns.filter((c) => c.key !== "lineas" && c.key !== "estatus");
+  // TXT: excluir columnas auxiliares que no van en el formato oficial
+  const skipHeaders = new Set(["Líneas", "No", "Proveedor", "Cliente", "Estatus"]);
+  const txtColumns = columns.filter((c) => !skipHeaders.has(c.header));
   const txtLines = rows.map((row) =>
-    txtColumns
-      .map((c) => {
-        const raw = row[c.header] ?? "";
-        return DATE_HEADERS.has(c.header) ? toDgiiDate(raw) : raw;
-      })
-      .join("|")
+    txtColumns.map((c) => row[c.header] ?? "").join("|")
   );
   const txtContent = txtLines.join("\r\n") + (txtLines.length ? "\r\n" : "");
 
