@@ -145,7 +145,7 @@ export function Chat() {
           disabled={isStreaming}
           onClick={() =>
             sendMessage({
-              text: "Genera el reporte del mes actual para 606 y 607.",
+              text: "Guarda todas las facturas de esta sesión y genera el reporte del mes actual.",
             })
           }
           className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
