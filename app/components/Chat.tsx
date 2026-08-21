@@ -350,7 +350,7 @@ export function Chat() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Escribe un mensaje o arrastra una factura aquí..."
+              placeholder="Mensaje opcional — o solo adjunta las facturas y da Enviar"
               className="min-w-0 flex-1 rounded-full border border-black/10 bg-neutral-50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-indigo-400 focus:bg-white dark:border-white/15 dark:bg-neutral-800 dark:focus:bg-neutral-800"
             />
             {isStreaming ? (
@@ -414,7 +414,7 @@ function MessageBubble({
 function WelcomeCard() {
   const steps = [
     { icon: "1️⃣", text: "Selecciona el tipo: Compra (606) o Venta (607)" },
-    { icon: "📎", text: "Adjunta las fotos o PDFs de las facturas (hasta 20 a la vez)" },
+    { icon: "📎", text: "Adjunta las fotos o PDFs de las facturas (hasta 20 a la vez) — sin texto obligatorio" },
     { icon: "⚡", text: "El sistema las lee y las registra automáticamente — sin preguntas" },
     { icon: "📊", text: "Cuando quieras el reporte, presiona «Generar reporte»" },
   ];
