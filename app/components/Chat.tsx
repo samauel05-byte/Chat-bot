@@ -328,7 +328,7 @@ export function Chat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Escribe un mensaje o arrastra una factura aquí..."
-              className="flex-1 rounded-full border border-black/10 bg-neutral-50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-indigo-400 focus:bg-white dark:border-white/15 dark:bg-neutral-800 dark:focus:bg-neutral-800"
+              className="min-w-0 flex-1 rounded-full border border-black/10 bg-neutral-50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-indigo-400 focus:bg-white dark:border-white/15 dark:bg-neutral-800 dark:focus:bg-neutral-800"
             />
             {isStreaming ? (
               <button
