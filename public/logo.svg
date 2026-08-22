@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 576" width="576" height="576">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="576" y2="576" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7B2CC0"/>
+      <stop offset="100%" stop-color="#9B36F2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="576" height="576" rx="118" ry="118" fill="url(#bg)"/>
+
+  <!-- N letterform: left vertical bar -->
+  <rect x="108" y="118" width="94" height="340" rx="47" fill="white"/>
+
+  <!-- N letterform: right vertical bar -->
+  <rect x="374" y="118" width="94" height="340" rx="47" fill="white"/>
+
+  <!-- N letterform: diagonal bar (rotated pill from upper-left to lower-right) -->
+  <rect
+    x="90" y="232"
+    width="396" height="90"
+    rx="45"
+    fill="white"
+    transform="rotate(48 288 277)"
+  />
+
+  <!-- Lavender dot accent (upper-right of N) -->
+  <circle cx="436" cy="136" r="36" fill="#E2D0FF" opacity="0.6"/>
+</svg>

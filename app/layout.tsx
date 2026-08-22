@@ -16,8 +16,13 @@ export const metadata: Metadata = {
   title: "NALA — Núcleo Automatizado de Listados Administrativos",
   description: "🤖 Automatiza la preparación de información para la DGII",
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: "/logo.svg",
+    apple: "/logo.svg",
+  },
+  openGraph: {
+    title: "NALA — Núcleo Automatizado de Listados Administrativos",
+    description: "🤖 Automatiza la preparación de información para la DGII",
+    images: [{ url: "/logo.svg", width: 576, height: 576 }],
   },
 };
 

@@ -141,7 +141,7 @@ export function Chat() {
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 bg-white px-5 py-4 shadow-sm dark:border-white/10 dark:bg-neutral-900">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center sm:h-14 sm:w-14">
-            <Image src="/logo.png" alt="NALA" width={56} height={56} priority />
+            <Image src="/logo.svg" alt="NALA" width={56} height={56} priority />
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50 sm:text-base">
