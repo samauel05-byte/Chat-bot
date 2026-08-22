@@ -118,19 +118,66 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes factu
 
 2. ESCANEA el documento completo de principio a fin y LISTA internamente cada factura que ves (por su NCF o número de página). Anota el total: N facturas.
 
-3. EXTRAE y REGISTRA cada factura de la lista, en orden, sin saltarte ninguna:
-   - Por cada factura llama a recordPurchase606 (606) o recordSale607 (607) con:
-     · proveedor: nombre del emisor/proveedor
-     · rncCedula: RNC del emisor (9 dígitos) — tipoId "1"
-     · tipoBienesServicios: código 01-11 según el tipo de gasto
-     · ncf: número de comprobante fiscal PROPIO de este documento
-     · ncfModificado: si es nota de crédito/débito, pon aquí el NCF original que modifica; si no, deja vacío
-     · fechaComprobante: SOLO año+mes en formato YYYYMM (ej: "14/04/26" → "202604")
-     · diaComprobante: SOLO el día en formato DD (ej: "14/04/26" → "14")
-     · totalMontoFacturado: monto total
-     · itbisFacturado: ITBIS (si aparece dos números, el menor suele ser el ITBIS)
-     · formaPago: código 01=efectivo, 02=cheque/transferencia, 03=tarjeta, 04=crédito
-     · Si un campo no aparece: usa 0 o vacío. NO preguntes. Si ilegible: usa "ILEGIBLE".
+3. EXTRAE y REGISTRA cada factura de la lista, en orden, sin saltarte ninguna.
+   Llena TODOS los campos en el orden exacto del escáner DGII:
+
+   ── Para recordPurchase606 (Compras 606) — columnas en orden del escáner ──
+   · proveedor            : nombre del emisor/proveedor
+   · rncCedula            : RNC (9 dígitos) o Cédula (11 dígitos) del proveedor
+   · tipoId               : "1" si RNC, "2" si Cédula
+   · tipoBienesServicios  : código 01–11 según el tipo de gasto/compra
+   · ncf                  : NCF propio de este documento
+   · ncfModificado        : NCF original que modifica (nota de crédito/débito); vacío si no aplica
+   · fechaComprobante     : SOLO año+mes YYYYMM  (ej: "14/04/26" → "202604")
+   · diaComprobante       : SOLO el día DD        (ej: "14/04/26" → "14")
+   · fechaPago            : mes del pago YYYYMM; vacío si no aplica
+   · diaPago              : día del pago DD; vacío si no aplica
+   · montoFacturadoServicios : monto de servicios; 0 si no aplica
+   · montoFacturadoBienes    : monto de bienes; 0 si no aplica
+   · totalMontoFacturado     : monto total de la factura
+   · itbisFacturado       : ITBIS de la factura (el menor si hay dos cifras)
+   · itbisRetenido        : ITBIS retenido; 0 si no aplica
+   · itbisProporcionalidad: ITBIS sujeto a proporcionalidad; 0 si no aplica
+   · itbisLlevadoCosto    : ITBIS llevado al costo; 0 si no aplica
+   · itbisPorAdelantar    : ITBIS por adelantar; 0 si no aplica
+   · itbisPercibidoCompras: ITBIS percibido en compras; 0 si no aplica
+   · tipoRetencionIsr     : código de retención ISR (00=ninguna, 01–08); default "00"
+   · montoRetencionRenta  : monto retención renta; 0 si no aplica
+   · isrPercibidoCompras  : ISR percibido en compras; 0 si no aplica
+   · isc                  : impuesto selectivo al consumo; 0 si no aplica
+   · otrosImpuestos       : otros impuestos/tasas; 0 si no aplica
+   · montoPropinaLegal    : monto propina legal; 0 si no aplica
+   · formaPago            : 01=efectivo, 02=cheque/transferencia, 03=tarjeta, 04=crédito, 05=permuta, 06=nota de crédito, 07=mixto
+
+   ── Para recordSale607 (Ventas 607) — columnas en orden del escáner ──
+   · cliente              : nombre del cliente/receptor
+   · rncCedulaPasaporte   : RNC (9 dígitos) o Cédula (11 dígitos) del cliente; vacío si no aplica
+   · tipoId               : "1" si RNC, "2" si Cédula; vacío si no aplica
+   · ncf                  : NCF propio de este documento
+   · ncfModificado        : NCF original que modifica; vacío si no aplica
+   · tipoIngreso          : 01=operaciones, 02=financieros, 03=extraordinarios, 04=arrendamientos, 05=venta activo, 06=otros
+   · fechaComprobante     : SOLO año+mes YYYYMM
+   · diaComprobante       : SOLO el día DD
+   · fechaRetencion       : mes de retención YYYYMM; vacío si no aplica
+   · diaRetencion         : día de retención DD; vacío si no aplica
+   · montoFacturado       : monto total facturado
+   · itbisFacturado       : ITBIS facturado; 0 si no aplica
+   · itbisRetenidoTerceros: ITBIS retenido por terceros; 0 si no aplica
+   · itbisPercibido       : ITBIS percibido; 0 si no aplica
+   · retencionRentaTerceros: retención renta por terceros; 0 si no aplica
+   · isrPercibido         : ISR percibido; 0 si no aplica
+   · isc                  : impuesto selectivo al consumo; 0 si no aplica
+   · otrosImpuestos       : otros impuestos/tasas; 0 si no aplica
+   · montoPropinaLegal    : monto propina legal; 0 si no aplica
+   · efectivo             : monto cobrado en efectivo; 0 si no aplica
+   · chequeTransferenciaDeposito: monto por cheque/transferencia/depósito; 0 si no aplica
+   · tarjetaDebitoCredito : monto por tarjeta; 0 si no aplica
+   · ventaCredito         : monto a crédito; 0 si no aplica
+   · bonosCertificadosRegalo: monto en bonos/certificados; 0 si no aplica
+   · permuta              : monto en permuta; 0 si no aplica
+   · otrasFormasVentas    : otras formas; 0 si no aplica
+
+   Regla para todos los campos: si no aparece en el documento → usa 0 o vacío. NO preguntes. Si ilegible → usa "ILEGIBLE".
 
    NOTAS DE CRÉDITO / DÉBITO — REGLA CRÍTICA:
    - Una nota de crédito (B04...) y la factura original (B01...) son DOCUMENTOS SEPARADOS.
