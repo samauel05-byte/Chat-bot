@@ -163,6 +163,14 @@ export function Chat() {
               🏢 {organization.name}
             </span>
           )}
+          {user?.id === process.env.NEXT_PUBLIC_ADMIN_USER_ID && (
+            <a
+              href="/admin"
+              className="hidden rounded-full border border-black/10 px-3 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-white/15 dark:text-neutral-300 sm:flex items-center gap-1"
+            >
+              ⚙️ Admin
+            </a>
+          )}
           <UserButton />
         </div>
       </header>
