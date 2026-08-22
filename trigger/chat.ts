@@ -164,7 +164,7 @@ export const invoiceChat = chat.agent({
       system,
       messages: preprocessMessages(messages),
       abortSignal: signal,
-      stopWhen: stepCountIs(200),
+      stopWhen: stepCountIs(2000),
     });
   },
 });
