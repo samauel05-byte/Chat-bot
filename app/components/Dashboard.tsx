@@ -74,7 +74,7 @@ export function Dashboard() {
           >
             💬 Ir al Chat
           </Link>
-          <UserButton afterSignOutUrl="/sign-in" />
+          <UserButton />
         </div>
       </header>
 

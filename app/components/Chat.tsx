@@ -163,7 +163,7 @@ export function Chat() {
               🏢 {organization.name}
             </span>
           )}
-          <UserButton afterSignOutUrl="/sign-in" />
+          <UserButton />
         </div>
       </header>
 

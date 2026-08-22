@@ -167,6 +167,6 @@ async function incrementStats(orgId: string, tipo: Tipo) {
 
 /** Lists all org IDs that have data (for super-admin view). */
 export async function listOrgs(): Promise<string[]> {
-  const result = await list({ prefix: "orgs/", mode: "folded", access: "private" });
+  const result = await list({ prefix: "orgs/", mode: "folded" });
   return result.folders?.map((f) => f.replace("orgs/", "").replace("/", "")) ?? [];
 }
