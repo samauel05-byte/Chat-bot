@@ -77,7 +77,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
       {!exiting && (
         <motion.div
           key="splash"
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-indigo-950 select-none cursor-pointer overflow-hidden"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-violet-950 select-none cursor-pointer overflow-hidden"
           onClick={skip}
           exit={{ opacity: 0, scale: 1.03 }}
           transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
@@ -87,7 +87,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
             {PARTICLES.map(([symbol, x, duration, delay, size, opacity], i) => (
               <motion.span
                 key={i}
-                className="absolute bottom-0 font-mono text-indigo-300 whitespace-nowrap"
+                className="absolute bottom-0 font-mono text-violet-300 whitespace-nowrap"
                 style={{
                   left: `${x}%`,
                   fontSize: `${size}rem`,
@@ -108,7 +108,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
 
           {/* ── Ambient glow ── */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-[500px] w-[500px] rounded-full bg-indigo-600/20 blur-[120px]" />
+            <div className="h-[500px] w-[500px] rounded-full bg-violet-600/20 blur-[120px]" />
           </div>
 
           {/* ── NALA letters ── */}
@@ -148,15 +148,15 @@ export function Splash({ onDone }: { onDone: () => void }) {
                 <span className="w-5 text-right text-base font-bold text-white/90 sm:text-lg">
                   {letter}
                 </span>
-                <span className="h-px w-4 bg-indigo-400/50" />
-                <span className="text-sm text-indigo-300 sm:text-base">{word}</span>
+                <span className="h-px w-4 bg-violet-400/50" />
+                <span className="text-sm text-violet-300 sm:text-base">{word}</span>
               </motion.div>
             ))}
           </motion.div>
 
           {/* ── Tagline ── */}
           <motion.p
-            className="relative mt-10 text-sm text-indigo-400 sm:text-base"
+            className="relative mt-10 text-sm text-violet-400 sm:text-base"
             initial={{ opacity: 0, y: 8 }}
             animate={{
               opacity: phase === "tagline" || phase === "done" ? 1 : 0,
@@ -169,7 +169,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
 
           {/* ── Skip hint ── */}
           <motion.p
-            className="absolute bottom-8 text-xs text-indigo-600"
+            className="absolute bottom-8 text-xs text-violet-600"
             initial={{ opacity: 0 }}
             animate={{ opacity: phase === "tagline" || phase === "done" ? 1 : 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}

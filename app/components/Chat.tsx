@@ -131,8 +131,8 @@ export function Chat() {
       onDrop={handleDrop}
     >
       {isDragging && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center border-4 border-dashed border-indigo-500 bg-indigo-500/10 backdrop-blur-sm">
-          <p className="rounded-xl bg-indigo-600 px-6 py-3 text-base font-medium text-white shadow-lg">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center border-4 border-dashed border-violet-500 bg-violet-500/10 backdrop-blur-sm">
+          <p className="rounded-xl bg-violet-600 px-6 py-3 text-base font-medium text-white shadow-lg">
             📥 Suelta tus facturas aquí — puedes soltar varias a la vez
           </p>
         </div>
@@ -171,7 +171,7 @@ export function Chat() {
                             a: ({ href, children }) => (
                               <a
                                 href={href}
-                                className="font-medium text-indigo-600 underline hover:text-indigo-800 dark:text-indigo-400"
+                                className="font-medium text-violet-600 underline hover:text-violet-800 dark:text-violet-400"
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
@@ -293,7 +293,7 @@ export function Chat() {
           </div>
 
           {files && files.length > 0 && (
-            <div className="mb-2.5 flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
+            <div className="mb-2.5 flex items-center gap-2 rounded-lg bg-violet-50 px-3 py-2 text-xs text-violet-800 dark:bg-violet-950/40 dark:text-violet-300">
               <span className="shrink-0">📎</span>
               <span className="shrink-0 font-medium">{files.length} archivo(s):</span>
               <span className="truncate">
@@ -322,7 +322,7 @@ export function Chat() {
           <div className="flex items-center gap-2">
             <label
               title="Elegir archivo"
-              className="flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-black/15 p-2.5 text-lg transition-colors hover:border-indigo-400 hover:bg-indigo-50 dark:border-white/20 dark:hover:bg-indigo-950/30"
+              className="flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-black/15 p-2.5 text-lg transition-colors hover:border-violet-400 hover:bg-violet-50 dark:border-white/20 dark:hover:bg-violet-950/30"
             >
               📎
               <input
@@ -338,7 +338,7 @@ export function Chat() {
             </label>
             <label
               title="Tomar foto con la cámara"
-              className="flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-black/15 p-2.5 text-lg transition-colors hover:border-indigo-400 hover:bg-indigo-50 dark:border-white/20 dark:hover:bg-indigo-950/30"
+              className="flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-black/15 p-2.5 text-lg transition-colors hover:border-violet-400 hover:bg-violet-50 dark:border-white/20 dark:hover:bg-violet-950/30"
             >
               📷
               <input
@@ -356,7 +356,7 @@ export function Chat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Mensaje opcional — o solo adjunta las facturas y da Enviar"
-              className="min-w-0 flex-1 rounded-full border border-black/10 bg-neutral-50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-indigo-400 focus:bg-white dark:border-white/15 dark:bg-neutral-800 dark:focus:bg-neutral-800"
+              className="min-w-0 flex-1 rounded-full border border-black/10 bg-neutral-50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-violet-400 focus:bg-white dark:border-white/15 dark:bg-neutral-800 dark:focus:bg-neutral-800"
             />
             {isStreaming ? (
               <button
@@ -370,7 +370,7 @@ export function Chat() {
               <button
                 type="submit"
                 disabled={isUploading}
-                className="shrink-0 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
+                className="shrink-0 rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
               >
                 {isUploading ? "⏳ Subiendo…" : "Enviar ➤"}
               </button>
@@ -397,7 +397,7 @@ function MessageBubble({
           "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm " +
           (isUser
             ? "bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900"
-            : "bg-indigo-600 text-white")
+            : "bg-violet-600 text-white")
         }
       >
         {isUser ? "🙂" : "🤖"}
@@ -406,7 +406,7 @@ function MessageBubble({
         className={
           "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm " +
           (isUser
-            ? "rounded-br-sm bg-indigo-600 text-white"
+            ? "rounded-br-sm bg-violet-600 text-white"
             : "rounded-bl-sm bg-white text-neutral-800 dark:bg-neutral-800 dark:text-neutral-100")
         }
       >
@@ -435,7 +435,7 @@ function WelcomeCard() {
       <ul className="space-y-3 text-left">
         {steps.map((step, i) => (
           <li key={i} className="flex items-center gap-3 text-sm text-neutral-700 dark:text-neutral-300">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-base dark:bg-indigo-950/40">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-base dark:bg-violet-950/40">
               {step.icon}
             </span>
             {step.text}
