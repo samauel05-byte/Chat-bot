@@ -93,7 +93,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
                   fontSize: `${size}rem`,
                   opacity,
                 }}
-                animate={{ y: [0, -window.innerHeight - 60] }}
+                animate={{ y: ["0%", "-120vh"] }}
                 transition={{
                   duration,
                   delay,
