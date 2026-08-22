@@ -5,19 +5,16 @@ import { z } from "zod";
 
 import { invoice606Schema } from "@/lib/dgii/schema606";
 import { invoice607Schema } from "@/lib/dgii/schema607";
-import {
-  appendInvoice606,
-  appendInvoice607,
-  listInvoices,
-} from "@/lib/dgii/store";
+import { appendInvoice606, appendInvoice607, listInvoices } from "@/lib/dgii/store";
 import { generateReport } from "@/lib/dgii/generateReport";
+import { orgContext } from "@/lib/orgContext";
 
 const MODEL = "claude-sonnet-5-20251001";
 
 const tools = {
   recordPurchase606: tool({
     description:
-      "Registra una factura de COMPRA (formato 606) ya confirmada por el usuario. Solo llama esto después de mostrarle los datos extraídos y que el usuario los confirme explícitamente.",
+      "Registra una factura de COMPRA (formato 606). Extrae los datos del documento y llama esta herramienta directamente, sin confirmar con el usuario.",
     inputSchema: invoice606Schema,
     execute: async (input) => {
       const lineas = await appendInvoice606(input);
@@ -27,7 +24,7 @@ const tools = {
 
   recordSale607: tool({
     description:
-      "Registra una factura de VENTA (formato 607) ya confirmada por el usuario. Solo llama esto después de mostrarle los datos extraídos y que el usuario los confirme explícitamente.",
+      "Registra una factura de VENTA (formato 607). Extrae los datos del documento y llama esta herramienta directamente.",
     inputSchema: invoice607Schema,
     execute: async (input) => {
       const lineas = await appendInvoice607(input);
@@ -37,14 +34,10 @@ const tools = {
 
   listRecordedInvoices: tool({
     description:
-      "Lista las facturas ya registradas de un tipo (606 o 607), opcionalmente filtradas por período (YYYYMM). Útil para revisar antes de generar el reporte final.",
+      "Lista las facturas ya registradas de un tipo (606 o 607), opcionalmente filtradas por período (YYYYMM).",
     inputSchema: z.object({
       tipo: z.enum(["606", "607"]),
-      periodo: z
-        .string()
-        .regex(/^\d{6}$/)
-        .optional()
-        .describe("YYYYMM, ej. 202507"),
+      periodo: z.string().regex(/^\d{6}$/).optional().describe("YYYYMM, ej. 202507"),
     }),
     execute: async ({ tipo, periodo }) => {
       return listInvoices(tipo, periodo);
@@ -53,23 +46,39 @@ const tools = {
 
   generateDgiiReport: tool({
     description:
-      "Genera el archivo .xlsx de revisión y el .txt delimitado por '|' listo para subir a la DGII, para un tipo (606/607) y período (YYYYMM).",
+      "Genera el archivo .xlsx de revisión y el .txt delimitado por '|' listo para subir a la DGII.",
     inputSchema: z.object({
       tipo: z.enum(["606", "607"]),
       periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM, ej. 202507"),
     }),
     execute: async ({ tipo, periodo }) => {
       const result = await generateReport(tipo, periodo);
+      const orgId = orgContext.getStore() ?? "default";
       return {
         ...result,
-        xlsxUrl: `/api/exports/${tipo}_${periodo}.xlsx`,
-        txtUrl: `/api/exports/${tipo}_${periodo}.txt`,
+        xlsxUrl: `/api/exports/${orgId}/${tipo}_${periodo}.xlsx`,
+        txtUrl: `/api/exports/${orgId}/${tipo}_${periodo}.txt`,
       };
     },
   }),
 };
 
 type FileMeta = { url: string; contentType: string; name: string };
+
+/** Extracts the [ORG:id] marker from messages (last occurrence wins). */
+function extractOrgId(messages: ModelMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role !== "user") continue;
+    const raw =
+      typeof msg.content === "string"
+        ? msg.content
+        : (msg.content.find((p) => (p as TextPart).type === "text") as TextPart | undefined)?.text ?? "";
+    const m = raw.match(/\[ORG:([^\]]+)\]/);
+    if (m) return m[1];
+  }
+  return "default";
+}
 
 function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
   return messages.map((msg) => {
@@ -80,20 +89,20 @@ function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
         ? msg.content
         : (msg.content.find((p: TextPart | unknown) => (p as TextPart).type === "text") as TextPart | undefined)?.text ?? "";
 
-    const markerMatch = rawText.match(/\[FACTURAS:([\s\S]*?)\]$/m);
-    if (!markerMatch) return msg;
+    // Strip both [ORG:...] and [FACTURAS:...] markers
+    const cleanBase = rawText.replace(/\s*\[ORG:[^\]]+\]/g, "").replace(/\s*\[FACTURAS:[\s\S]*?\]$/, "").trim();
 
-    let files: FileMeta[] = [];
-    try {
-      files = JSON.parse(markerMatch[1]);
-    } catch {
-      return msg;
+    const markerMatch = rawText.match(/\[FACTURAS:([\s\S]*?)\]$/m);
+    if (!markerMatch) {
+      if (cleanBase === rawText) return msg;
+      return { ...msg, content: cleanBase } as UserModelMessage;
     }
 
-    const cleanText = rawText.replace(/\s*\[FACTURAS:[\s\S]*?\]$/, "").trim();
+    let files: FileMeta[] = [];
+    try { files = JSON.parse(markerMatch[1]); } catch { return msg; }
 
     const content: UserModelMessage["content"] = [];
-    if (cleanText) content.push({ type: "text", text: cleanText });
+    if (cleanBase) content.push({ type: "text", text: cleanBase });
 
     for (const f of files) {
       if (f.contentType.startsWith("image/")) {
@@ -107,7 +116,8 @@ function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
   });
 }
 
-const SYSTEM_PROMPT_BASE = `Eres NALA (Núcleo Automatizado de Listados Administrativos), un asistente de Save Consultores, S.R.L. que automatiza la preparación de información para la DGII procesando facturas en formato 606 (Compras) y 607 (Ventas) de República Dominicana.
+function buildSystemPrompt(orgId: string) {
+  return `Eres NALA (Núcleo Automatizado de Listados Administrativos), un asistente de Save Consultores, S.R.L. que automatiza la preparación de información para la DGII procesando facturas en formato 606 (Compras) y 607 (Ventas) de República Dominicana.
 
 REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes facturas:
 
@@ -135,12 +145,11 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes factu
    NOTAS DE CRÉDITO / DÉBITO — REGLA CRÍTICA:
    - Una nota de crédito (B04...) y la factura original (B01...) son DOCUMENTOS SEPARADOS.
    - Cada uno tiene su propio NCF distinto — nunca son el mismo número.
-   - Si ves un NCF que parece igual al de otra factura, léelo con cuidado: probablemente difieren en los últimos dígitos o en el prefijo (B01 vs B04).
    - NUNCA saltes un documento porque creas que ya lo registraste. Registra TODOS.
-   - Si el documento tiene N facturas/notas, debes hacer exactamente N llamadas. Nunca pares antes.
+   - Si el documento tiene N facturas/notas, debes hacer exactamente N llamadas.
 
 4. VERIFICA: llama a listRecordedInvoices para el tipo y período actual. Compara el total registrado con N.
-   - Si registradas < N: vuelve al paso 3 y procesa las que faltan (relée el documento).
+   - Si registradas < N: vuelve al paso 3 y procesa las que faltan.
    - Si registradas = N: continúa.
 
 5. Llama a generateDgiiReport con el tipo y el período del mes actual (YYYYMM).
@@ -148,12 +157,12 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes factu
 6. Muestra un resumen breve en tabla: #, Proveedor, NCF, Fecha (AAAAMM+DD), Monto, ITBIS.
 
 7. Comparte los links de descarga como markdown:
-   [📥 Descargar Excel](/api/exports/606_YYYYMM.xlsx) | [📄 Descargar TXT](/api/exports/606_YYYYMM.txt)
-   (reemplaza 606 y YYYYMM con los valores reales).
+   [📥 Descargar Excel](/api/exports/${orgId}/606_YYYYMM.xlsx) | [📄 Descargar TXT](/api/exports/${orgId}/606_YYYYMM.txt)
+   (reemplaza 606 y YYYYMM con los valores reales del reporte que acabas de generar).
 
 ── CUANDO EL USUARIO PIDE "GENERAR REPORTE" MANUALMENTE ──
 - Llama a generateDgiiReport para el tipo y período indicado (si no indica, mes actual).
-- Comparte los links de descarga.
+- Comparte los links de descarga con el orgId correcto.
 
 ── REGLAS GENERALES ──
 - Nunca pares a mitad de un lote. Si el documento tiene 30 facturas, las 30 deben quedar registradas.
@@ -161,6 +170,7 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes factu
 
 No hagas preámbulos. Extrae, registra, genera y comparte links.
 Responde siempre en español.`;
+}
 
 export const invoiceChat = chat.agent({
   id: "invoice-chat",
@@ -172,15 +182,18 @@ export const invoiceChat = chat.agent({
     },
   },
   run: async ({ messages, tools: runTools, signal }) => {
-    const system = SYSTEM_PROMPT_BASE;
+    const orgId = extractOrgId(messages);
+    const system = buildSystemPrompt(orgId);
 
-    return streamText({
-      ...chat.toStreamTextOptions({ tools: runTools }),
-      model: anthropic(MODEL),
-      system,
-      messages: preprocessMessages(messages),
-      abortSignal: signal,
-      stopWhen: stepCountIs(2000),
-    });
+    return orgContext.run(orgId, () =>
+      streamText({
+        ...chat.toStreamTextOptions({ tools: runTools }),
+        model: anthropic(MODEL),
+        system,
+        messages: preprocessMessages(messages),
+        abortSignal: signal,
+        stopWhen: stepCountIs(2000),
+      })
+    );
   },
 });
