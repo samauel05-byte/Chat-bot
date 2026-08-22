@@ -12,7 +12,7 @@ import {
 } from "@/lib/dgii/store";
 import { generateReport } from "@/lib/dgii/generateReport";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "claude-sonnet-5-20251001";
 
 const tools = {
   recordPurchase606: tool({
@@ -116,7 +116,7 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes factu
    - "Esta factura es una VENTA" → 607
    - Sin indicación → asume 606.
 
-2. EXTRAE de cada factura adjunta:
+2. CUENTA primero cuántas facturas hay en el documento (una por una). Luego EXTRAE de CADA factura, sin saltarte ninguna:
    - proveedor: nombre del emisor/proveedor
    - rncCedula: RNC del emisor (9 dígitos) — tipoId "1"
    - tipoBienesServicios: código 01-11 según el tipo de gasto
@@ -129,7 +129,7 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes factu
    - Si un campo no aparece: usa 0 o vacío. NO preguntes nunca.
    - Si un dato es ilegible: usa "ILEGIBLE".
 
-3. REGISTRA cada factura llamando a recordPurchase606 (606) o recordSale607 (607). Puedes hacer varias llamadas seguidas.
+3. REGISTRA cada factura llamando a recordPurchase606 (606) o recordSale607 (607). Haz una llamada por cada factura identificada — si contaste 30, deben ser 30 llamadas. No pares antes.
 
 4. Luego llama a generateDgiiReport con el tipo y el período del mes actual (YYYYMM).
 
