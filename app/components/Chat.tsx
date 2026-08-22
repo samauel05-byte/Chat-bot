@@ -141,14 +141,14 @@ export function Chat() {
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 bg-white px-5 py-4 shadow-sm dark:border-white/10 dark:bg-neutral-900">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center sm:h-14 sm:w-14">
-            <Image src="/logo.png" alt="Save Consultores, S.R.L." width={56} height={56} priority />
+            <Image src="/logo.png" alt="NALA" width={56} height={56} priority />
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50 sm:text-base">
-              Asistente Nala — Sistema de Factura 606 y 607
+              NALA — Núcleo Automatizado de Listados Administrativos
             </h1>
             <p className="hidden text-xs text-neutral-500 dark:text-neutral-400 sm:block">
-              Save Consultores, S.R.L. — te ayudo a preparar los reportes de la DGII
+              🤖 Automatiza la preparación de información para la DGII
             </p>
           </div>
         </div>
@@ -425,12 +425,12 @@ function WelcomeCard() {
   ];
   return (
     <div className="mx-auto mb-6 max-w-md rounded-2xl border border-black/5 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-neutral-900">
-      <div className="mb-2 text-3xl">👋</div>
+      <div className="mb-2 text-3xl">🤖</div>
       <h2 className="mb-1 text-base font-semibold text-neutral-900 dark:text-neutral-50">
-        Procesamiento de facturas 606 / 607
+        NALA — Núcleo Automatizado de Listados Administrativos
       </h2>
       <p className="mb-5 text-sm text-neutral-500 dark:text-neutral-400">
-        Simple y directo — sin confirmaciones:
+        Automatiza la preparación de información para la DGII:
       </p>
       <ul className="space-y-3 text-left">
         {steps.map((step, i) => (

@@ -107,7 +107,7 @@ function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
   });
 }
 
-const SYSTEM_PROMPT_BASE = `Eres un asistente de una empresa contable que procesa facturas DGII 606 (Compras) y 607 (Ventas) de República Dominicana.
+const SYSTEM_PROMPT_BASE = `Eres NALA (Núcleo Automatizado de Listados Administrativos), un asistente de Save Consultores, S.R.L. que automatiza la preparación de información para la DGII procesando facturas en formato 606 (Compras) y 607 (Ventas) de República Dominicana.
 
 REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes facturas:
 
