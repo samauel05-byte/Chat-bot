@@ -91,6 +91,7 @@ export function Chat() {
         const uploaded = await Promise.all(
           Array.from(files).map(async (file) => {
             const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+            // Upload directly from browser to Vercel Blob CDN (bypasses 4.5 MB serverless limit)
             const blob = await upload(`uploads/${safeName}`, file, {
               access: "private",
               handleUploadUrl: "/api/upload",
@@ -144,25 +145,13 @@ export function Chat() {
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50 sm:text-base">
-              Asistente de facturación 606 / 607
+              Asistente Nala — Sistema de Factura 606 y 607
             </h1>
             <p className="hidden text-xs text-neutral-500 dark:text-neutral-400 sm:block">
               Save Consultores, S.R.L. — te ayudo a preparar los reportes de la DGII
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          disabled={isStreaming}
-          onClick={() =>
-            sendMessage({
-              text: "Guarda todas las facturas de esta sesión y genera el reporte del mes actual.",
-            })
-          }
-          className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          📊 Generar reporte
-        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
@@ -432,7 +421,7 @@ function WelcomeCard() {
     { icon: "1️⃣", text: "Selecciona el tipo: Compra (606) o Venta (607)" },
     { icon: "📎", text: "Adjunta las fotos o PDFs de las facturas — sin texto obligatorio" },
     { icon: "⚡", text: "El sistema las lee y las registra automáticamente — sin preguntas" },
-    { icon: "📊", text: "Cuando quieras el reporte, presiona «Generar reporte»" },
+    { icon: "📊", text: "El reporte se genera automáticamente después de procesar las facturas" },
   ];
   return (
     <div className="mx-auto mb-6 max-w-md rounded-2xl border border-black/5 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-neutral-900">

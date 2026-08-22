@@ -8,10 +8,9 @@ export async function POST(req: NextRequest) {
     const jsonResponse = await handleUpload({
       body,
       request: req,
-      onBeforeGenerateToken: async (pathname) => ({
-        access: "private",
+      onBeforeGenerateToken: async () => ({
+        maximumSizeInBytes: 200 * 1024 * 1024, // 200 MB
         addRandomSuffix: true,
-        maximumSizeInBytes: 100 * 1024 * 1024, // 100 MB
         allowedContentTypes: [
           "image/jpeg",
           "image/png",
