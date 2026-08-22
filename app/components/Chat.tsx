@@ -145,10 +145,10 @@ export function Chat() {
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50 sm:text-base">
-              Asistente Nala — Sistema de Factura 606 y 607
+              NALA — Núcleo Automatizado de Listados Administrativos
             </h1>
             <p className="hidden text-xs text-neutral-500 dark:text-neutral-400 sm:block">
-              Save Consultores, S.R.L. — te ayudo a preparar los reportes de la DGII
+              🤖 Automatiza la preparación de información para la DGII
             </p>
           </div>
         </div>

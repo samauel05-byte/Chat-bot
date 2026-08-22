@@ -1,8 +1,8 @@
 @AGENTS.md
 
-# Nala — DGII Invoice Processing Chatbot
+# NALA — Núcleo Automatizado de Listados Administrativos
 
-A Spanish-language AI chatbot that reads invoice images/PDFs and automatically generates DGII tax reports (Formats 606 and 607) for the Dominican Republic. Built for Save Consultores, S.R.L.
+🤖 Automatiza la preparación de información para la DGII. An AI assistant that reads invoice images/PDFs and automatically generates DGII tax reports (Formats 606 and 607) for the Dominican Republic. Built for Save Consultores, S.R.L.
 
 ## Stack
 

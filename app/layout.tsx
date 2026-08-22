@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Save Consultores — Facturación 606/607",
-  description: "Chatbot de facturación DGII — formatos 606 y 607",
+  title: "NALA — Núcleo Automatizado de Listados Administrativos",
+  description: "🤖 Automatiza la preparación de información para la DGII",
   icons: {
     icon: "/logo.png",
     apple: "/logo.png",
