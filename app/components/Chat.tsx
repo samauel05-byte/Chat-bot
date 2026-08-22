@@ -6,6 +6,7 @@ import { useChat } from "@ai-sdk/react";
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react";
 import type { invoiceChat } from "@/trigger/chat";
 import { mintChatAccessToken, startChatSession } from "@/app/actions/chat";
+import { upload } from "@vercel/blob/client";
 import Markdown from "react-markdown";
 
 const TOOL_LABELS: Record<string, string> = {
@@ -89,14 +90,13 @@ export function Chat() {
       try {
         const uploaded = await Promise.all(
           Array.from(files).map(async (file) => {
-            const fd = new FormData();
-            fd.append("file", file);
-            const res = await fetch("/api/upload", { method: "POST", body: fd });
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}));
-              throw new Error((err as { error?: string }).error ?? "Error subiendo archivo");
-            }
-            return res.json() as Promise<{ url: string; contentType: string; name: string }>;
+            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+            const blob = await upload(`uploads/${safeName}`, file, {
+              access: "private",
+              handleUploadUrl: "/api/upload",
+            });
+            const proxyUrl = `${window.location.origin}/api/invoice/${blob.pathname}`;
+            return { url: proxyUrl, contentType: file.type, name: file.name };
           })
         );
         const marker = `\n\n[FACTURAS:${JSON.stringify(uploaded)}]`;
@@ -430,7 +430,7 @@ function MessageBubble({
 function WelcomeCard() {
   const steps = [
     { icon: "1️⃣", text: "Selecciona el tipo: Compra (606) o Venta (607)" },
-    { icon: "📎", text: "Adjunta las fotos o PDFs de las facturas (hasta 20 a la vez) — sin texto obligatorio" },
+    { icon: "📎", text: "Adjunta las fotos o PDFs de las facturas — sin texto obligatorio" },
     { icon: "⚡", text: "El sistema las lee y las registra automáticamente — sin preguntas" },
     { icon: "📊", text: "Cuando quieras el reporte, presiona «Generar reporte»" },
   ];

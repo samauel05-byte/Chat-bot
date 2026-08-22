@@ -1,31 +1,36 @@
-import { put } from "@vercel/blob";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextRequest, NextResponse } from "next/server";
-
-const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: "Archivo demasiado grande (máx 25 MB)" }, { status: 413 });
-    }
+    const body = (await req.json()) as HandleUploadBody;
 
-    const blob = await put(`uploads/${file.name}`, file, {
-      access: "private",
-      addRandomSuffix: true,
-      contentType: file.type || "application/octet-stream",
+    const jsonResponse = await handleUpload({
+      body,
+      request: req,
+      onBeforeGenerateToken: async (pathname) => ({
+        access: "private",
+        addRandomSuffix: true,
+        maximumSizeInBytes: 100 * 1024 * 1024, // 100 MB
+        allowedContentTypes: [
+          "image/jpeg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+          "image/heic",
+          "image/heif",
+          "application/pdf",
+        ],
+      }),
+      onUploadCompleted: async () => {
+        // nothing required — client builds the proxy URL from blob.pathname
+      },
     });
 
-    // Build a proxy URL so the agent can fetch the private blob via our own route
-    const origin = new URL(req.url).origin;
-    const proxyUrl = `${origin}/api/invoice/${blob.pathname}`;
-
-    return NextResponse.json({ url: proxyUrl, contentType: file.type, name: file.name });
+    return NextResponse.json(jsonResponse);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[upload] error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
