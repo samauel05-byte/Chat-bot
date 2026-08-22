@@ -123,14 +123,21 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes factu
      · proveedor: nombre del emisor/proveedor
      · rncCedula: RNC del emisor (9 dígitos) — tipoId "1"
      · tipoBienesServicios: código 01-11 según el tipo de gasto
-     · ncf: número de comprobante fiscal
+     · ncf: número de comprobante fiscal PROPIO de este documento
+     · ncfModificado: si es nota de crédito/débito, pon aquí el NCF original que modifica; si no, deja vacío
      · fechaComprobante: SOLO año+mes en formato YYYYMM (ej: "14/04/26" → "202604")
      · diaComprobante: SOLO el día en formato DD (ej: "14/04/26" → "14")
      · totalMontoFacturado: monto total
      · itbisFacturado: ITBIS (si aparece dos números, el menor suele ser el ITBIS)
      · formaPago: código 01=efectivo, 02=cheque/transferencia, 03=tarjeta, 04=crédito
      · Si un campo no aparece: usa 0 o vacío. NO preguntes. Si ilegible: usa "ILEGIBLE".
-   - Si el documento tiene N facturas, debes hacer exactamente N llamadas. Nunca pares antes.
+
+   NOTAS DE CRÉDITO / DÉBITO — REGLA CRÍTICA:
+   - Una nota de crédito (B04...) y la factura original (B01...) son DOCUMENTOS SEPARADOS.
+   - Cada uno tiene su propio NCF distinto — nunca son el mismo número.
+   - Si ves un NCF que parece igual al de otra factura, léelo con cuidado: probablemente difieren en los últimos dígitos o en el prefijo (B01 vs B04).
+   - NUNCA saltes un documento porque creas que ya lo registraste. Registra TODOS.
+   - Si el documento tiene N facturas/notas, debes hacer exactamente N llamadas. Nunca pares antes.
 
 4. VERIFICA: llama a listRecordedInvoices para el tipo y período actual. Compara el total registrado con N.
    - Si registradas < N: vuelve al paso 3 y procesa las que faltan (relée el documento).
