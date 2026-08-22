@@ -8,7 +8,6 @@ import type { invoiceChat } from "@/trigger/chat";
 import { mintChatAccessToken, startChatSession } from "@/app/actions/chat";
 import { upload } from "@vercel/blob/client";
 import Markdown from "react-markdown";
-import { useOrganization, useUser, UserButton } from "@clerk/nextjs";
 
 const TOOL_LABELS: Record<string, string> = {
   getCompanyConfig: "🔍 Revisando los datos de tu empresa",
@@ -25,10 +24,6 @@ function toolLabel(toolType: string) {
 }
 
 export function Chat() {
-  const { organization } = useOrganization();
-  const { user } = useUser();
-  const orgId = organization?.id ?? user?.id ?? "default";
-
   const transport = useTriggerChatTransport<typeof invoiceChat>({
     task: "invoice-chat",
     accessToken: ({ chatId }) => mintChatAccessToken(chatId),
@@ -105,7 +100,7 @@ export function Chat() {
             return { url: proxyUrl, contentType: file.type, name: file.name };
           })
         );
-        const marker = `\n\n[ORG:${orgId}][FACTURAS:${JSON.stringify(uploaded)}]`;
+        const marker = `\n\n[FACTURAS:${JSON.stringify(uploaded)}]`;
         sendMessage({ text: baseText + marker });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Error subiendo el archivo";
@@ -116,7 +111,7 @@ export function Chat() {
         setIsUploading(false);
       }
     } else {
-      sendMessage({ text: `[ORG:${orgId}] ` + baseText });
+      sendMessage({ text: baseText });
     }
 
     setInput("");
@@ -157,22 +152,6 @@ export function Chat() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {organization && (
-            <span className="hidden text-xs text-neutral-500 dark:text-neutral-400 sm:block">
-              🏢 {organization.name}
-            </span>
-          )}
-          {user?.id === process.env.NEXT_PUBLIC_ADMIN_USER_ID && (
-            <a
-              href="/admin"
-              className="hidden rounded-full border border-black/10 px-3 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-white/15 dark:text-neutral-300 sm:flex items-center gap-1"
-            >
-              ⚙️ Admin
-            </a>
-          )}
-          <UserButton />
-        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
@@ -183,7 +162,7 @@ export function Chat() {
             <MessageBubble key={message.id} role={message.role}>
               {message.parts.map((part, i) => {
                 if (part.type === "text") {
-                  const displayText = part.text.replace(/\s*\[ORG:[^\]]+\]\s*/g, "").replace(/\s*\[FACTURAS:[\s\S]*?\]$/, "").trim();
+                  const displayText = part.text.replace(/\s*\[FACTURAS:[\s\S]*?\]$/, "").trim();
                   if (message.role === "assistant") {
                     return (
                       <div key={i} className="prose prose-sm dark:prose-invert max-w-none">
