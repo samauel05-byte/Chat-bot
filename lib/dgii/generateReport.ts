@@ -2,11 +2,13 @@ import { put } from "@vercel/blob";
 import ExcelJS from "exceljs";
 import { COLUMNS_606 } from "./schema606";
 import { COLUMNS_607 } from "./schema607";
+import { COLUMNS_IR17 } from "./schemaIR17";
 import { listInvoices, EXPORTS_PREFIX, type Tipo } from "./store";
 
 const COLUMNS: Record<Tipo, { key: string; header: string }[]> = {
   "606": COLUMNS_606,
   "607": COLUMNS_607,
+  "IR17": COLUMNS_IR17,
 };
 
 export type GenerateReportResult = {
@@ -34,11 +36,39 @@ export async function generateReport(tipo: Tipo, periodo: string): Promise<Gener
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(`Formato ${tipo}`);
-  sheet.addRow(columns.map((c) => c.header));
+
+  // Header row
+  const headerRow = sheet.addRow(columns.map((c) => c.header));
+  headerRow.font = { bold: true };
+  headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFF6600" } };
+  headerRow.alignment = { horizontal: "center" };
+
+  // Data rows
   for (const row of rows) {
     sheet.addRow(columns.map((c) => row[c.header] ?? ""));
   }
-  sheet.getRow(1).font = { bold: true };
+
+  // Totals row for IR17 (yellow, bold, with column sums)
+  if (tipo === "IR17" && rows.length > 0) {
+    const numericHeaders = new Set(["Base", "3%", "18%", "TOTAL", "A pagar"]);
+    const totalsRow = sheet.addRow(
+      columns.map((c) => {
+        if (c.header === "CEDULA/PASS") return "TOTALES";
+        if (numericHeaders.has(c.header)) {
+          const sum = rows.reduce((acc, r) => acc + parseFloat(r[c.header] ?? "0") || 0, 0);
+          return sum.toFixed(2);
+        }
+        return "";
+      })
+    );
+    totalsRow.font = { bold: true };
+    totalsRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFFF00" } };
+  }
+
+  // Column widths
+  columns.forEach((_, idx) => {
+    sheet.getColumn(idx + 1).width = 18;
+  });
   const xlsxBuffer = await workbook.xlsx.writeBuffer();
 
   // TXT: excluir columnas auxiliares que no van en el formato oficial

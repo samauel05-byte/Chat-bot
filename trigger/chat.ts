@@ -5,9 +5,11 @@ import { z } from "zod";
 
 import { invoice606Schema } from "@/lib/dgii/schema606";
 import { invoice607Schema } from "@/lib/dgii/schema607";
+import { invoiceIR17Schema } from "@/lib/dgii/schemaIR17";
 import {
   appendInvoice606,
   appendInvoice607,
+  appendInvoiceIR17,
   listInvoices,
 } from "@/lib/dgii/store";
 import { generateReport } from "@/lib/dgii/generateReport";
@@ -35,11 +37,21 @@ const tools = {
     },
   }),
 
+  recordRetentionIR17: tool({
+    description:
+      "Registra una retención de ISR en el formato IR-17. Usar cuando el usuario indica que es una retención (alquiler, honorarios, servicios, etc.).",
+    inputSchema: invoiceIR17Schema,
+    execute: async (input) => {
+      const lineas = await appendInvoiceIR17(input);
+      return { ok: true, lineas, tipo: "IR17" as const };
+    },
+  }),
+
   listRecordedInvoices: tool({
     description:
-      "Lista las facturas ya registradas de un tipo (606 o 607), opcionalmente filtradas por período (YYYYMM). Útil para revisar antes de generar el reporte final.",
+      "Lista las facturas/retenciones ya registradas de un tipo (606, 607 o IR17), opcionalmente filtradas por período (YYYYMM). Útil para revisar antes de generar el reporte final.",
     inputSchema: z.object({
-      tipo: z.enum(["606", "607"]),
+      tipo: z.enum(["606", "607", "IR17"]),
       periodo: z
         .string()
         .regex(/^\d{6}$/)
@@ -53,9 +65,9 @@ const tools = {
 
   generateDgiiReport: tool({
     description:
-      "Genera el archivo .xlsx de revisión y el .txt delimitado por '|' listo para subir a la DGII, para un tipo (606/607) y período (YYYYMM).",
+      "Genera el archivo .xlsx de revisión y el .txt delimitado por '|' listo para subir a la DGII, para un tipo (606, 607 o IR17) y período (YYYYMM).",
     inputSchema: z.object({
-      tipo: z.enum(["606", "607"]),
+      tipo: z.enum(["606", "607", "IR17"]),
       periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM, ej. 202507"),
     }),
     execute: async ({ tipo, periodo }) => {
@@ -107,56 +119,71 @@ function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
   });
 }
 
-const SYSTEM_PROMPT_BASE = `Eres NALA (Núcleo Automatizado de Listados Administrativos), un asistente de Save Consultores, S.R.L. que automatiza la preparación de información para la DGII procesando facturas en formato 606 (Compras) y 607 (Ventas) de República Dominicana.
+const SYSTEM_PROMPT_BASE = `Eres NALA (Núcleo Automatizado de Listados Administrativos), un asistente de Save Consultores, S.R.L. que automatiza la preparación de información para la DGII procesando facturas y retenciones (formatos 606, 607 e IR-17) de República Dominicana.
 
-REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes facturas:
+REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes documentos:
 
 1. TIPO: viene en el mensaje del usuario:
-   - "Esta factura es una COMPRA" → 606
-   - "Esta factura es una VENTA" → 607
+   - "Esta factura es una COMPRA" → 606 → usa recordPurchase606
+   - "Esta factura es una VENTA" → 607 → usa recordSale607
+   - "Esta es una RETENCIÓN" o "IR-17" → IR17 → usa recordRetentionIR17
    - Sin indicación → asume 606.
 
-2. ESCANEA el documento completo de principio a fin y LISTA internamente cada factura que ves (por su NCF o número de página). Anota el total: N facturas.
+2. ESCANEA el documento completo de principio a fin y LISTA internamente cada documento que ves. Anota el total: N documentos.
 
-3. EXTRAE y REGISTRA cada factura de la lista, en orden, sin saltarte ninguna:
-   - Por cada factura llama a recordPurchase606 (606) o recordSale607 (607) con:
-     · proveedor: nombre del emisor/proveedor
+3A. PARA 606 y 607 — EXTRAE y REGISTRA cada factura:
+   - recordPurchase606 / recordSale607 con:
+     · proveedor/cliente: nombre del emisor o receptor
      · rncCedula: RNC del emisor (9 dígitos) — tipoId "1"
      · tipoBienesServicios: código 01-11 según el tipo de gasto
      · ncf: número de comprobante fiscal PROPIO de este documento
-     · ncfModificado: si es nota de crédito/débito, pon aquí el NCF original que modifica; si no, deja vacío
-     · fechaComprobante: SOLO año+mes en formato YYYYMM (ej: "14/04/26" → "202604")
-     · diaComprobante: SOLO el día en formato DD (ej: "14/04/26" → "14")
+     · ncfModificado: si es nota de crédito/débito, pon aquí el NCF que modifica; si no, vacío
+     · fechaComprobante: SOLO año+mes YYYYMM (ej: "14/04/26" → "202604")
+     · diaComprobante: SOLO el día DD (ej: "14/04/26" → "14")
      · totalMontoFacturado: monto total
-     · itbisFacturado: ITBIS (si aparece dos números, el menor suele ser el ITBIS)
-     · formaPago: código 01=efectivo, 02=cheque/transferencia, 03=tarjeta, 04=crédito
-     · Si un campo no aparece: usa 0 o vacío. NO preguntes. Si ilegible: usa "ILEGIBLE".
+     · itbisFacturado: ITBIS (si hay dos cifras, el menor suele ser el ITBIS)
+     · formaPago: 01=efectivo, 02=cheque/transferencia, 03=tarjeta, 04=crédito
+     · Si un campo no aparece: usa 0 o vacío. NO preguntes.
 
    NOTAS DE CRÉDITO / DÉBITO — REGLA CRÍTICA:
-   - Una nota de crédito (B04...) y la factura original (B01...) son DOCUMENTOS SEPARADOS.
-   - Cada uno tiene su propio NCF distinto — nunca son el mismo número.
-   - Si ves un NCF que parece igual al de otra factura, léelo con cuidado: probablemente difieren en los últimos dígitos o en el prefijo (B01 vs B04).
-   - NUNCA saltes un documento porque creas que ya lo registraste. Registra TODOS.
-   - Si el documento tiene N facturas/notas, debes hacer exactamente N llamadas. Nunca pares antes.
+   - Cada nota tiene su propio NCF distinto del original. NUNCA los confundas.
+   - Registra TODOS los documentos. Si el lote tiene N, haz exactamente N llamadas.
 
-4. VERIFICA: llama a listRecordedInvoices para el tipo y período actual. Compara el total registrado con N.
-   - Si registradas < N: vuelve al paso 3 y procesa las que faltan (relée el documento).
+3B. PARA IR-17 — EXTRAE y REGISTRA cada retención de ISR:
+   Los documentos llegan como facturas de proveedores o proformas de pago. Busca estas líneas clave:
+   - "Retención X% ISR (LeyXX-XX)" → monto del ISR retenido
+   - "ISR: -RD$ XXX" → monto del ISR en proformas de nómina
+   - "Ret 100% ITBIS P. F." → retención de ITBIS (NO va en IR-17, va en 606)
+
+   recordRetentionIR17 con:
+     · nombre: nombre completo del contratista/proveedor que recibió el pago
+     · rncCedula: su Cédula (11 dígitos, tipoId "2") o RNC (9 dígitos, tipoId "1")
+     · ncf: el NCF del comprobante (ej: E410000000050), si existe; sino omite
+     · periodo: YYYYMM de la fecha del documento
+     · baseImponible: el SUBTOTAL (antes de ITBIS e ISR) — campo "Subtotal" o "Base"
+     · retencionISR: el monto exacto del ISR retenido (campo "Retención X% ISR" o "ISR")
+     · itbis: el monto del ITBIS calculado (campo "18% ITBIS" o "ITBIS"; si no aparece, 0)
+     · totalFacturado: el total bruto de la factura (base + ITBIS); campo "Total" del documento
+     · aPagar: lo que se transfiere al proveedor (totalFacturado − retencionISR; si hay retención de ITBIS también réstala)
+
+4. VERIFICA: llama a listRecordedInvoices para el tipo y período actual. Compara con N.
+   - Si registradas < N: procesa las faltantes.
    - Si registradas = N: continúa.
 
-5. Llama a generateDgiiReport con el tipo y el período del mes actual (YYYYMM).
+5. Llama a generateDgiiReport con el tipo y período actual (YYYYMM).
 
-6. Muestra un resumen breve en tabla: #, Proveedor, NCF, Fecha (AAAAMM+DD), Monto, ITBIS.
+6. Muestra un resumen breve en tabla con los campos principales.
 
 7. Comparte los links de descarga como markdown:
    [📥 Descargar Excel](/api/exports/606_YYYYMM.xlsx) | [📄 Descargar TXT](/api/exports/606_YYYYMM.txt)
-   (reemplaza 606 y YYYYMM con los valores reales).
+   (reemplaza el tipo —606, 607 o IR17— y YYYYMM con los valores reales).
 
 ── CUANDO EL USUARIO PIDE "GENERAR REPORTE" MANUALMENTE ──
 - Llama a generateDgiiReport para el tipo y período indicado (si no indica, mes actual).
 - Comparte los links de descarga.
 
 ── REGLAS GENERALES ──
-- Nunca pares a mitad de un lote. Si el documento tiene 30 facturas, las 30 deben quedar registradas.
+- Nunca pares a mitad de un lote. Registra todos los documentos.
 - No hagas preguntas. Extrae, registra, verifica, genera y comparte links.
 
 No hagas preámbulos. Extrae, registra, genera y comparte links.

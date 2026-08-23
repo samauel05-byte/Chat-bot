@@ -2,19 +2,23 @@ import { get, put } from "@vercel/blob";
 import Papa from "papaparse";
 import { COLUMNS_606, type Invoice606 } from "./schema606";
 import { COLUMNS_607, type Invoice607 } from "./schema607";
+import { COLUMNS_IR17, type InvoiceIR17 } from "./schemaIR17";
 
-export type Tipo = "606" | "607";
+export type Tipo = "606" | "607" | "IR17";
 
 const CONFIG_PATHNAME = "config.json";
 export const EXPORTS_PREFIX = "exports/";
 
 function csvPathname(tipo: Tipo): string {
-  return tipo === "606" ? "606.csv" : "607.csv";
+  if (tipo === "606") return "606.csv";
+  if (tipo === "607") return "607.csv";
+  return "IR17.csv";
 }
 
 const COLUMNS: Record<Tipo, { key: string; header: string }[]> = {
   "606": COLUMNS_606,
   "607": COLUMNS_607,
+  "IR17": COLUMNS_IR17,
 };
 
 export type CompanyConfig = { rnc: string; nombre: string };
@@ -28,6 +32,7 @@ export type CompanyConfig = { rnc: string; nombre: string };
 const writeLocks: Record<Tipo, Promise<unknown>> = {
   "606": Promise.resolve(),
   "607": Promise.resolve(),
+  "IR17": Promise.resolve(),
 };
 
 function withWriteLock<T>(tipo: Tipo, fn: () => Promise<T>): Promise<T> {
@@ -79,6 +84,9 @@ export async function listInvoices(
 ): Promise<Record<string, string>[]> {
   const rows = await readRows(tipo);
   if (!periodo) return rows;
+  if (tipo === "IR17") {
+    return rows.filter((r) => (r["Período"] ?? "").replace(/-/g, "").startsWith(periodo));
+  }
   return rows.filter((r) => (r["Fecha Comprobante"] ?? "").replace(/-/g, "").startsWith(periodo));
 }
 
@@ -114,4 +122,8 @@ export async function appendInvoice606(record: Invoice606): Promise<number> {
 
 export async function appendInvoice607(record: Invoice607): Promise<number> {
   return appendRow("607", record);
+}
+
+export async function appendInvoiceIR17(record: InvoiceIR17): Promise<number> {
+  return appendRow("IR17", record);
 }

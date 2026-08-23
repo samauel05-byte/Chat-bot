@@ -14,6 +14,7 @@ const TOOL_LABELS: Record<string, string> = {
   setCompanyConfig: "🏢 Guardando los datos de tu empresa",
   recordPurchase606: "🧾 Guardando factura de compra (606)",
   recordSale607: "🧾 Guardando factura de venta (607)",
+  recordRetentionIR17: "🏦 Guardando retención IR-17",
   listRecordedInvoices: "📋 Revisando las facturas guardadas",
   generateDgiiReport: "📊 Generando tu reporte",
 };
@@ -33,7 +34,7 @@ export function Chat() {
   const { messages, sendMessage, stop, status, error } = useChat({ transport });
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<FileList | undefined>(undefined);
-  const [mode, setMode] = useState<"606" | "607" | null>(null);
+  const [mode, setMode] = useState<"606" | "607" | "IR17" | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -44,9 +45,10 @@ export function Chat() {
   const lastMessage = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMessage?.role !== "assistant";
 
-  const MODE_PREFIX: Record<"606" | "607", string> = {
+  const MODE_PREFIX: Record<"606" | "607" | "IR17", string> = {
     "606": "Esta factura es una COMPRA: regístrala como formato 606. ",
     "607": "Esta factura es una VENTA: regístrala como formato 607. ",
+    "IR17": "Esta es una RETENCIÓN: regístrala como formato IR-17. ",
   };
 
   function mergeFiles(existing: FileList | undefined, incoming: FileList | File[]): FileList {
@@ -285,6 +287,18 @@ export function Chat() {
             >
               💰 Venta (607)
             </button>
+            <button
+              type="button"
+              onClick={() => setMode((m) => (m === "IR17" ? null : "IR17"))}
+              className={
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
+                (mode === "IR17"
+                  ? "border-amber-600 bg-amber-600 text-white"
+                  : "border-black/10 text-neutral-600 hover:border-amber-300 dark:border-white/15 dark:text-neutral-300")
+              }
+            >
+              🏦 Retención (IR-17)
+            </button>
             {!mode && (
               <span className="text-xs text-neutral-400 dark:text-neutral-500">
                 (si no eliges, se asume Compra 606)
@@ -394,13 +408,15 @@ function MessageBubble({
     <div className={"flex items-end gap-2 " + (isUser ? "flex-row-reverse" : "flex-row")}>
       <div
         className={
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm " +
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm overflow-hidden " +
           (isUser
             ? "bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900"
-            : "bg-violet-600 text-white")
+            : "")
         }
       >
-        {isUser ? "🙂" : "🤖"}
+        {isUser ? "🙂" : (
+          <Image src="/logo.svg" alt="NALA" width={28} height={28} className="h-7 w-7 rounded-full" />
+        )}
       </div>
       <div
         className={
@@ -418,30 +434,45 @@ function MessageBubble({
 
 function WelcomeCard() {
   const steps = [
-    { icon: "1️⃣", text: "Selecciona el tipo: Compra (606) o Venta (607)" },
-    { icon: "📎", text: "Adjunta las fotos o PDFs de las facturas — sin texto obligatorio" },
-    { icon: "⚡", text: "El sistema las lee y las registra automáticamente — sin preguntas" },
-    { icon: "📊", text: "El reporte se genera automáticamente después de procesar las facturas" },
+    { icon: "🛒", text: "Compras (606), Ventas (607) o Retenciones ISR (IR-17)" },
+    { icon: "📎", text: "Adjunta fotos o PDFs de las facturas — sin texto obligatorio" },
+    { icon: "⚡", text: "NALA las lee y registra automáticamente, sin preguntas" },
+    { icon: "📊", text: "El reporte .xlsx y .txt se genera listo para la DGII" },
   ];
   return (
-    <div className="mx-auto mb-6 max-w-md rounded-2xl border border-black/5 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-neutral-900">
-      <div className="mb-2 text-3xl">🤖</div>
-      <h2 className="mb-1 text-base font-semibold text-neutral-900 dark:text-neutral-50">
-        NALA — Núcleo Automatizado de Listados Administrativos
-      </h2>
-      <p className="mb-5 text-sm text-neutral-500 dark:text-neutral-400">
-        Automatiza la preparación de información para la DGII:
-      </p>
-      <ul className="space-y-3 text-left">
-        {steps.map((step, i) => (
-          <li key={i} className="flex items-center gap-3 text-sm text-neutral-700 dark:text-neutral-300">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-base dark:bg-violet-950/40">
-              {step.icon}
-            </span>
-            {step.text}
-          </li>
-        ))}
-      </ul>
+    <div className="mx-auto mb-6 max-w-md overflow-hidden rounded-2xl border border-black/5 bg-white shadow-md dark:border-white/10 dark:bg-neutral-900">
+      {/* Animated hero */}
+      <div className="relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-violet-600 to-purple-800 px-6 pb-8 pt-10">
+        {/* Background orbs */}
+        <div className="nala-orb-1 absolute -left-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+        <div className="nala-orb-2 absolute -bottom-6 -right-6 h-28 w-28 rounded-full bg-violet-300/20 blur-2xl" />
+        {/* Floating logo */}
+        <div className="nala-float relative z-10 mb-4">
+          <Image src="/logo.svg" alt="NALA" width={72} height={72} priority className="rounded-2xl shadow-xl" />
+        </div>
+        <h2 className="relative z-10 text-center text-base font-bold text-white drop-shadow-sm">
+          NALA
+        </h2>
+        <p className="relative z-10 mt-0.5 text-center text-xs text-violet-200">
+          Núcleo Automatizado de Listados Administrativos
+        </p>
+      </div>
+      {/* Steps */}
+      <div className="p-5">
+        <p className="mb-4 text-center text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+          Cómo funciona
+        </p>
+        <ul className="space-y-3">
+          {steps.map((step, i) => (
+            <li key={i} className="flex items-center gap-3 text-sm text-neutral-700 dark:text-neutral-300">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-base dark:bg-violet-950/40">
+                {step.icon}
+              </span>
+              {step.text}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
