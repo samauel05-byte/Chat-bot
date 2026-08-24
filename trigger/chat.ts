@@ -3,96 +3,12 @@ import { streamText, stepCountIs, tool, type ModelMessage, type UserModelMessage
 import { anthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 
-import { invoice606Schema } from "@/lib/dgii/schema606";
-import { invoice607Schema } from "@/lib/dgii/schema607";
-import { invoiceIR17Schema } from "@/lib/dgii/schemaIR17";
-import {
-  appendInvoice606,
-  appendInvoice607,
-  appendInvoiceIR17,
-  clearRecords,
-  listInvoices,
-} from "@/lib/dgii/store";
+import { invoice606Schema, type Invoice606 } from "@/lib/dgii/schema606";
+import { invoice607Schema, type Invoice607 } from "@/lib/dgii/schema607";
+import { invoiceIR17Schema, type InvoiceIR17 } from "@/lib/dgii/schemaIR17";
 import { generateReport } from "@/lib/dgii/generateReport";
 
 const MODEL = "claude-sonnet-5-20251001";
-
-const tools = {
-  recordPurchase606: tool({
-    description:
-      "Registra una factura de COMPRA (formato 606) ya confirmada por el usuario. Solo llama esto después de mostrarle los datos extraídos y que el usuario los confirme explícitamente.",
-    inputSchema: invoice606Schema,
-    execute: async (input) => {
-      const lineas = await appendInvoice606(input);
-      return { ok: true, lineas, tipo: "606" as const };
-    },
-  }),
-
-  recordSale607: tool({
-    description:
-      "Registra una factura de VENTA (formato 607) ya confirmada por el usuario. Solo llama esto después de mostrarle los datos extraídos y que el usuario los confirme explícitamente.",
-    inputSchema: invoice607Schema,
-    execute: async (input) => {
-      const lineas = await appendInvoice607(input);
-      return { ok: true, lineas, tipo: "607" as const };
-    },
-  }),
-
-  recordRetentionIR17: tool({
-    description:
-      "Registra una retención de ISR en el formato IR-17. Usar cuando el usuario indica que es una retención (alquiler, honorarios, servicios, etc.).",
-    inputSchema: invoiceIR17Schema,
-    execute: async (input) => {
-      const lineas = await appendInvoiceIR17(input);
-      return { ok: true, lineas, tipo: "IR17" as const };
-    },
-  }),
-
-  clearRecords: tool({
-    description:
-      "Limpia todos los registros guardados de un tipo (606, 607 o IR17) para empezar un lote nuevo desde cero. SIEMPRE llamar esto PRIMERO antes de registrar cualquier factura del lote.",
-    inputSchema: z.object({
-      tipo: z.enum(["606", "607", "IR17"]),
-    }),
-    execute: async ({ tipo }) => {
-      await clearRecords(tipo);
-      return { ok: true, tipo, mensaje: `Registros de ${tipo} limpiados. Listo para nuevo lote.` };
-    },
-  }),
-
-  listRecordedInvoices: tool({
-    description:
-      "Lista las facturas/retenciones ya registradas de un tipo (606, 607 o IR17), opcionalmente filtradas por período (YYYYMM). Útil para revisar antes de generar el reporte final.",
-    inputSchema: z.object({
-      tipo: z.enum(["606", "607", "IR17"]),
-      periodo: z
-        .string()
-        .regex(/^\d{6}$/)
-        .optional()
-        .describe("YYYYMM, ej. 202507"),
-    }),
-    execute: async ({ tipo, periodo }) => {
-      return listInvoices(tipo, periodo);
-    },
-  }),
-
-  generateDgiiReport: tool({
-    description:
-      "Genera el archivo .xlsx de revisión y el .txt delimitado por '|' listo para subir a la DGII, para un tipo (606, 607 o IR17) y período (YYYYMM).",
-    inputSchema: z.object({
-      tipo: z.enum(["606", "607", "IR17"]),
-      periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM, ej. 202507"),
-    }),
-    execute: async ({ tipo, periodo }) => {
-      const result = await generateReport(tipo, periodo);
-      return {
-        ...result,
-        xlsxUrl: `/api/exports/${tipo}_${periodo}.xlsx`,
-        txtUrl: `/api/exports/${tipo}_${periodo}.txt`,
-      };
-    },
-  }),
-};
 
 type FileMeta = { url: string; contentType: string; name: string };
 
@@ -135,10 +51,6 @@ function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
 const SYSTEM_PROMPT_BASE = `Eres NALA (Núcleo Automatizado de Listados Administrativos), un asistente de Save Consultores, S.R.L. que automatiza la preparación de información para la DGII procesando facturas y retenciones (formatos 606, 607 e IR-17) de República Dominicana.
 
 REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes documentos:
-
-0. LIMPIA PRIMERO: antes de registrar cualquier factura del lote, llama clearRecords con el tipo
-   correspondiente. Esto garantiza que el reporte final contenga SOLO las facturas de este lote,
-   sin mezclar con lotes anteriores.
 
 1. TIPO: viene en el mensaje del usuario:
    - "Esta factura es una COMPRA" → 606 → usa recordPurchase606
@@ -183,7 +95,7 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes docum
      · totalFacturado: el total bruto de la factura (base + ITBIS); campo "Total" del documento
      · aPagar: lo que se transfiere al proveedor (totalFacturado − retencionISR; si hay retención de ITBIS también réstala)
 
-4. VERIFICA: llama a listRecordedInvoices para el tipo y período actual. Compara con N.
+4. VERIFICA: llama a listRecordedInvoices para el tipo actual. Compara con N.
    - Si registradas < N: procesa las faltantes.
    - Si registradas = N: continúa.
 
@@ -208,20 +120,86 @@ Responde siempre en español.`;
 
 export const invoiceChat = chat.agent({
   id: "invoice-chat",
-  tools,
   uiMessageStreamOptions: {
     onError: (error) => {
       console.error("invoice-chat stream error:", error);
       return "Hubo un problema generando la respuesta. Intenta de nuevo.";
     },
   },
-  run: async ({ messages, tools: runTools, signal }) => {
-    const system = SYSTEM_PROMPT_BASE;
+  run: async ({ messages, signal }) => {
+    // ── Per-run in-memory session ──────────────────────────────────────────
+    // Each user message starts a fresh run with isolated storage.
+    // No accumulation between sessions, no cross-user contamination.
+    const session: {
+      "606": Invoice606[];
+      "607": Invoice607[];
+      "IR17": InvoiceIR17[];
+    } = { "606": [], "607": [], "IR17": [] };
+
+    const tools = {
+      recordPurchase606: tool({
+        description:
+          "Registra una factura de COMPRA (formato 606) en la sesión actual.",
+        inputSchema: invoice606Schema,
+        execute: async (input) => {
+          session["606"].push(input);
+          return { ok: true, lineas: session["606"].length, tipo: "606" as const };
+        },
+      }),
+
+      recordSale607: tool({
+        description:
+          "Registra una factura de VENTA (formato 607) en la sesión actual.",
+        inputSchema: invoice607Schema,
+        execute: async (input) => {
+          session["607"].push(input);
+          return { ok: true, lineas: session["607"].length, tipo: "607" as const };
+        },
+      }),
+
+      recordRetentionIR17: tool({
+        description:
+          "Registra una retención de ISR (formato IR-17) en la sesión actual.",
+        inputSchema: invoiceIR17Schema,
+        execute: async (input) => {
+          session["IR17"].push(input);
+          return { ok: true, lineas: session["IR17"].length, tipo: "IR17" as const };
+        },
+      }),
+
+      listRecordedInvoices: tool({
+        description:
+          "Lista las facturas/retenciones registradas en esta sesión por tipo (606, 607 o IR17).",
+        inputSchema: z.object({
+          tipo: z.enum(["606", "607", "IR17"]),
+        }),
+        execute: async ({ tipo }) => {
+          return { tipo, count: session[tipo].length, records: session[tipo] };
+        },
+      }),
+
+      generateDgiiReport: tool({
+        description:
+          "Genera el archivo .xlsx y el .txt listo para subir a la DGII, con las facturas de esta sesión.",
+        inputSchema: z.object({
+          tipo: z.enum(["606", "607", "IR17"]),
+          periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM, ej. 202507"),
+        }),
+        execute: async ({ tipo, periodo }) => {
+          const result = await generateReport(tipo, periodo, session[tipo] as Record<string, unknown>[]);
+          return {
+            ...result,
+            xlsxUrl: `/api/exports/${tipo}_${periodo}.xlsx`,
+            txtUrl: `/api/exports/${tipo}_${periodo}.txt`,
+          };
+        },
+      }),
+    };
 
     return streamText({
-      ...chat.toStreamTextOptions({ tools: runTools }),
       model: anthropic(MODEL),
-      system,
+      system: SYSTEM_PROMPT_BASE,
+      tools,
       messages: preprocessMessages(messages),
       abortSignal: signal,
       stopWhen: stepCountIs(2000),
