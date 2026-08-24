@@ -12,7 +12,7 @@
 | Runtime | React 19, TypeScript 5 |
 | Styling | Tailwind CSS v4 |
 | AI runtime | Trigger.dev v4 chat agent |
-| AI model | `claude-sonnet-5-20251001` via `@ai-sdk/anthropic` |
+| AI model | `gpt-5.6-terra` via `@ai-sdk/openai` |
 | AI SDK | Vercel AI SDK v7 (`ai` package) |
 | File storage | Vercel Blob (private access) |
 | Validation | Zod v4 |
@@ -55,8 +55,8 @@ next.config.ts                    # Next.js config (currently default)
 2. **Client** uploads files directly to Vercel Blob CDN via `@vercel/blob/client` (bypasses the 4.5 MB Next.js serverless limit). Upload is validated by `/api/upload`.
 3. **Client** embeds blob URLs as a `[FACTURAS:…]` JSON marker appended to the message text, then calls `sendMessage`.
 4. **Trigger.dev** receives the message through a real-time session (minted via `mintChatAccessToken` / `startChatSession` server actions).
-5. **`trigger/chat.ts`** pre-processes messages: strips the marker and converts URLs to AI SDK `image` / `file` content parts, then calls `streamText` with `anthropic(MODEL)`.
-6. **Claude** (vision-capable) reads each invoice and calls tools (`recordPurchase606`, `recordSale607`, `listRecordedInvoices`, `generateDgiiReport`) in a step loop (up to 2000 steps).
+5. **`trigger/chat.ts`** pre-processes messages: strips the marker and converts URLs to AI SDK `image` / `file` content parts, then calls `streamText` with `openai(MODEL)`.
+6. **OpenAI** (vision-capable) reads each invoice and calls the report generation tools in a step loop (up to 2000 steps).
 7. **Tools** read/write CSV data in Vercel Blob (private) and generate `.xlsx`/`.txt` export files.
 8. **Client** renders streamed response parts: text (via `react-markdown`), tool-call badges, and file attachments.
 
@@ -107,7 +107,7 @@ Assistant messages use `react-markdown` with custom `<a>` rendering (opens in ne
 
 ```bash
 TRIGGER_SECRET_KEY=        # Trigger.dev dev secret key (from project API Keys page)
-ANTHROPIC_API_KEY=         # Anthropic API key (must support vision / claude-sonnet-5)
+OPENAI_API_KEY=            # OpenAI API key (must support vision / gpt-5.6-terra)
 BLOB_READ_WRITE_TOKEN=     # Vercel Blob token (auto-set by `vercel env pull`)
 ```
 
@@ -152,7 +152,7 @@ Tool call status is shown in the UI via `TOOL_LABELS` in `Chat.tsx`. Add a new l
 This app is deployed on Vercel. Key notes:
 - The Vercel Blob token is set via `BLOB_READ_WRITE_TOKEN` in Vercel environment settings
 - The Trigger.dev worker is deployed separately via `trigger deploy`
-- Both the Next.js app and the Trigger.dev worker need `ANTHROPIC_API_KEY`
+- The Trigger.dev worker needs `OPENAI_API_KEY`
 
 ## UI Language
 
