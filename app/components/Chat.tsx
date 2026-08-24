@@ -198,14 +198,6 @@ export function Chat() {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          title="Iniciar una sesión limpia para un nuevo lote de facturas"
-          className="shrink-0 rounded-full border border-black/10 px-3 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:border-violet-400 hover:bg-violet-50 dark:border-white/15 dark:text-neutral-300 dark:hover:bg-violet-950/30"
-        >
-          🔄 Nuevo lote
-        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
