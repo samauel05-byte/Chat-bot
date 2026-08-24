@@ -121,26 +121,18 @@ Responde siempre en español.`;
 
 export const invoiceChat = chat.agent({
   id: "invoice-chat",
-  uiMessageStreamOptions: {
-    onError: (error) => {
-      console.error("invoice-chat stream error:", error);
-      return "Hubo un problema generando la respuesta. Intenta de nuevo.";
-    },
-  },
-  run: async ({ messages, signal }) => {
-    // ── Per-run in-memory session ──────────────────────────────────────────
-    // Each user message starts a fresh run with isolated storage.
-    // No accumulation between sessions, no cross-user contamination.
+  // tools() se ejecuta UNA VEZ POR TURNO — garantiza buffer fresco en cada mensaje.
+  // Esto evita que facturas de un turno anterior se acumulen en el siguiente.
+  tools: () => {
     const session: {
       "606": Invoice606[];
       "607": Invoice607[];
       "IR17": InvoiceIR17[];
     } = { "606": [], "607": [], "IR17": [] };
 
-    const tools = {
+    return {
       recordPurchase606: tool({
-        description:
-          "Registra una factura de COMPRA (formato 606) en la sesión actual.",
+        description: "Registra una factura de COMPRA (formato 606) en el turno actual.",
         inputSchema: invoice606Schema,
         execute: async (input) => {
           session["606"].push(input);
@@ -149,8 +141,7 @@ export const invoiceChat = chat.agent({
       }),
 
       recordSale607: tool({
-        description:
-          "Registra una factura de VENTA (formato 607) en la sesión actual.",
+        description: "Registra una factura de VENTA (formato 607) en el turno actual.",
         inputSchema: invoice607Schema,
         execute: async (input) => {
           session["607"].push(input);
@@ -159,8 +150,7 @@ export const invoiceChat = chat.agent({
       }),
 
       recordRetentionIR17: tool({
-        description:
-          "Registra una retención de ISR (formato IR-17) en la sesión actual.",
+        description: "Registra una retención de ISR (formato IR-17) en el turno actual.",
         inputSchema: invoiceIR17Schema,
         execute: async (input) => {
           session["IR17"].push(input);
@@ -169,8 +159,7 @@ export const invoiceChat = chat.agent({
       }),
 
       listRecordedInvoices: tool({
-        description:
-          "Lista las facturas/retenciones registradas en esta sesión por tipo (606, 607 o IR17).",
+        description: "Lista las facturas/retenciones registradas en este turno por tipo (606, 607 o IR17).",
         inputSchema: z.object({
           tipo: z.enum(["606", "607", "IR17"]),
         }),
@@ -180,8 +169,7 @@ export const invoiceChat = chat.agent({
       }),
 
       generateDgiiReport: tool({
-        description:
-          "Genera el archivo .xlsx y el .txt listo para subir a la DGII, con las facturas de esta sesión.",
+        description: "Genera el .xlsx y el .txt con SOLO las facturas subidas en este turno.",
         inputSchema: z.object({
           tipo: z.enum(["606", "607", "IR17"]),
           periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM, ej. 202507"),
@@ -196,9 +184,16 @@ export const invoiceChat = chat.agent({
         },
       }),
     };
-
+  },
+  uiMessageStreamOptions: {
+    onError: (error) => {
+      console.error("invoice-chat stream error:", error);
+      return "Hubo un problema generando la respuesta. Intenta de nuevo.";
+    },
+  },
+  run: async ({ messages, tools: runTools, signal }) => {
     return streamText({
-      ...chat.toStreamTextOptions({ tools }),
+      ...chat.toStreamTextOptions({ tools: runTools }),
       model: anthropic(MODEL),
       system: SYSTEM_PROMPT_BASE,
       messages: preprocessMessages(messages),
