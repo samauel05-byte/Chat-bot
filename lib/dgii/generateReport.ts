@@ -53,6 +53,7 @@ function addExcelDropdown(
   column: number,
   listColumn: number,
   values: ExcelList,
+  firstDataRow: number,
   lastDataRow: number
 ) {
   const listSheet = sheet.workbook.getWorksheet("Listas DGII");
@@ -66,7 +67,7 @@ function addExcelDropdown(
 
   const source = `'Listas DGII'!$${columnLetter(listColumn)}$2:$${columnLetter(listColumn)}$${labels.length + 1}`;
   const finalRow = Math.max(lastDataRow + 100, 1000);
-  for (let row = 2; row <= finalRow; row += 1) {
+  for (let row = firstDataRow; row <= finalRow; row += 1) {
     sheet.getCell(row, column).dataValidation = {
       type: "list",
       allowBlank: true,
@@ -150,18 +151,40 @@ export async function generateReport(
 
   const workbook = new ExcelJS.Workbook();
   workbook.calcProperties.fullCalcOnLoad = true;
-  const sheet = workbook.addWorksheet(`Formato ${tipo}`);
+  const sheet = workbook.addWorksheet(tipo === "606" ? "DIGITAR" : `Formato ${tipo}`);
   const listSheet = workbook.addWorksheet("Listas DGII", { state: "hidden" });
   const totalAmountColumn =
     columns.findIndex((column) => column.key === "totalMontoFacturado") + 1 ||
     columns.findIndex((column) => column.key === "montoFacturado") + 1;
   const sumColumn = columns.length + 1;
+  const firstDataRow = tipo === "606" ? 10 : 2;
 
-  // Header row
-  const headerRow = sheet.addRow([...columns.map((c) => c.header), "Sumatoria"]);
+  // El 606 replica la disposición de la hoja DIGITAR de la herramienta DGII.
+  let headerRow: ExcelJS.Row;
+  if (tipo === "606") {
+    sheet.mergeCells("C2:H2");
+    sheet.getCell("C2").value = "HERRAMIENTA DE ENVÍO — FORMATO 606";
+    sheet.getCell("C2").font = { bold: true, size: 14, color: { argb: "FF17365D" } };
+    sheet.getCell("C3").value = "PERÍODO";
+    sheet.getCell("D3").value = periodo;
+    sheet.getCell("C4").value = "FACTURAS";
+    sheet.getCell("D4").value = normalizedRows.length;
+    sheet.getCell("C3").font = sheet.getCell("C4").font = { bold: true };
+    headerRow = sheet.getRow(firstDataRow - 1);
+    headerRow.values = [...columns.map((c) => c.header), "Sumatoria"];
+    sheet.views = [{ state: "frozen", ySplit: firstDataRow - 1 }];
+  } else {
+    headerRow = sheet.addRow([...columns.map((c) => c.header), "Sumatoria"]);
+  }
   headerRow.font = { bold: true };
-  headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFF6600" } };
-  headerRow.alignment = { horizontal: "center" };
+  headerRow.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: tipo === "606" ? "FF17365D" : "FFFF6600" },
+  };
+  headerRow.font = { bold: true, color: { argb: tipo === "606" ? "FFFFFFFF" : "FF000000" } };
+  headerRow.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+  headerRow.height = tipo === "606" ? 52 : 30;
 
   // Data rows (add line numbers)
   normalizedRows.forEach((row, idx) => {
@@ -203,7 +226,7 @@ export async function generateReport(
     const totalRow = sheet.addRow(columns.map(() => ""));
     totalRow.getCell(Math.max(1, sumColumn - 1)).value = "TOTAL FACTURAS";
     totalRow.getCell(sumColumn).value = {
-      formula: `IF(SUM(${columnLetter(sumColumn)}2:${columnLetter(sumColumn)}${totalRow.number - 1})=0,"",SUM(${columnLetter(sumColumn)}2:${columnLetter(sumColumn)}${totalRow.number - 1}))`,
+      formula: `IF(SUM(${columnLetter(sumColumn)}${firstDataRow}:${columnLetter(sumColumn)}${totalRow.number - 1})=0,"",SUM(${columnLetter(sumColumn)}${firstDataRow}:${columnLetter(sumColumn)}${totalRow.number - 1}))`,
     };
     totalRow.getCell(sumColumn).numFmt = "#,##0.00";
     totalRow.font = { bold: true };
@@ -221,7 +244,16 @@ export async function generateReport(
     ];
     dropdowns.forEach(([key, values], index) => {
       const column = columns.findIndex((item) => item.key === key) + 1;
-      if (column > 0) addExcelDropdown(sheet, column, index + 1, values, normalizedRows.length + 1);
+      if (column > 0) {
+        addExcelDropdown(
+          sheet,
+          column,
+          index + 1,
+          values,
+          firstDataRow,
+          firstDataRow + normalizedRows.length - 1
+        );
+      }
     });
     listSheet.state = "veryHidden";
   } else {
@@ -252,6 +284,12 @@ export async function generateReport(
   [...columns, { key: "sumatoria", header: "Sumatoria" }].forEach((_, idx) => {
     sheet.getColumn(idx + 1).width = 20;
   });
+  if (tipo === "606") {
+    sheet.autoFilter = {
+      from: { row: headerRow.number, column: 1 },
+      to: { row: headerRow.number + normalizedRows.length, column: sumColumn },
+    };
+  }
 
   const xlsxBuffer = await workbook.xlsx.writeBuffer();
 
