@@ -60,7 +60,7 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes docum
 
 2. ESCANEA el documento completo de principio a fin y LISTA internamente cada documento que ves, en el orden exacto en que aparecen. Anota el total: N documentos.
 
-3A. PARA 606 y 607 — EXTRAE y REGISTRA cada factura ESTRICTAMENTE en el orden del escáner (página 1 → página 2 → … → última). Registra una, espera confirmación del tool call, luego pasa a la siguiente:
+3A. PARA 606 y 607 — EXTRAE y REGISTRA todas las facturas en una sola ronda de tool calls, en el orden del escáner (página 1 primero, luego página 2, etc.):
    - recordPurchase606 / recordSale607 con:
      · proveedor/cliente: nombre del emisor o receptor
      · rncCedula: RNC del emisor (9 dígitos) — tipoId "1"
