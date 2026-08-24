@@ -65,7 +65,11 @@ function addExcelDropdown(
     listSheet.getCell(index + 2, listColumn).value = label;
   });
 
-  const source = `'Listas DGII'!$${columnLetter(listColumn)}$2:$${columnLetter(listColumn)}$${labels.length + 1}`;
+  // Excel no permite usar directamente otra hoja como origen de validación.
+  // Un nombre definido conserva el menú desplegable en el archivo descargado.
+  const sourceRange = `'Listas DGII'!$${columnLetter(listColumn)}$2:$${columnLetter(listColumn)}$${labels.length + 1}`;
+  const sourceName = `DGII_606_LISTA_${listColumn}`;
+  sheet.workbook.definedNames.add(sourceRange, sourceName);
   const finalRow = Math.max(lastDataRow + 100, 1000);
   for (let row = firstDataRow; row <= finalRow; row += 1) {
     sheet.getCell(row, column).dataValidation = {
@@ -73,7 +77,7 @@ function addExcelDropdown(
       allowBlank: true,
       showErrorMessage: true,
       errorStyle: "error",
-      formulae: [source],
+      formulae: [sourceName],
     };
   }
 }
@@ -239,7 +243,12 @@ export async function generateReport(
     const dropdowns: Array<[string, ExcelList]> = [
       ["tipoBienesServicios", TIPO_BIENES_SERVICIOS_606],
       ["tipoId", TIPO_IDENTIFICACION],
-      ["tipoRetencionIsr", TIPO_RETENCION_ISR_606],
+      [
+        "tipoRetencionIsr",
+        Object.fromEntries(
+          Object.entries(TIPO_RETENCION_ISR_606).filter(([code]) => code !== "00")
+        ),
+      ],
       ["formaPago", FORMA_PAGO_606],
     ];
     dropdowns.forEach(([key, values], index) => {
