@@ -1,46 +1,21 @@
 import { z } from "zod";
+import {
+  FORMA_PAGO_606,
+  TIPO_BIENES_SERVICIOS_606,
+  TIPO_RETENCION_ISR_606,
+} from "./catalogs";
+
+export {
+  FORMA_PAGO_606,
+  TIPO_BIENES_SERVICIOS_606,
+  TIPO_RETENCION_ISR_606,
+} from "./catalogs";
 
 /**
  * Formato 606 — Compras de Bienes y Servicios.
  * Columnas y catálogos tomados tal cual de "Herramienta de Envio Formato 606.xls"
  * (DGII, hoja "Herramienta Formato 606", Version 2020.2).
  */
-
-export const TIPO_BIENES_SERVICIOS_606 = {
-  "01": "GASTOS DE PERSONAL",
-  "02": "GASTOS POR TRABAJOS, SUMINISTROS Y SERVICIOS",
-  "03": "ARRENDAMIENTOS",
-  "04": "GASTOS DE ACTIVOS FIJO",
-  "05": "GASTOS DE REPRESENTACIÓN",
-  "06": "OTRAS DEDUCCIONES ADMITIDAS",
-  "07": "GASTOS FINANCIEROS",
-  "08": "GASTOS EXTRAORDINARIOS",
-  "09": "COMPRAS Y GASTOS QUE FORMARAN PARTE DEL COSTO DE VENTA",
-  "10": "ADQUISICIONES DE ACTIVOS",
-  "11": "GASTOS DE SEGUROS",
-} as const;
-
-export const TIPO_RETENCION_ISR_606 = {
-  "00": "NINGUNA",
-  "01": "ALQUILERES",
-  "02": "HONORARIOS POR SERVICIOS",
-  "03": "OTRAS RENTAS",
-  "04": "OTRAS RENTAS (RENTAS PRESUNTAS)",
-  "05": "INTERESES PAGADOS A PERSONAS JURIDICAS RESIDENTES",
-  "06": "INTERESES PAGADOS A PERSONAS FISICAS RESIDENTES",
-  "07": "RETENCION POR PROVEEDORES DEL ESTADO",
-  "08": "JUEGOS TELEFONICOS",
-} as const;
-
-export const FORMA_PAGO_606 = {
-  "01": "EFECTIVO",
-  "02": "CHEQUES/TRANSFERENCIAS/DEPÓSITO",
-  "03": "TARJETA CRÉDITO/DÉBITO",
-  "04": "COMPRA A CREDITO",
-  "05": "PERMUTA",
-  "06": "NOTA DE CREDITO",
-  "07": "MIXTO",
-} as const;
 
 const tipoBienesServiciosCodes = Object.keys(TIPO_BIENES_SERVICIOS_606) as [
   string,
@@ -60,8 +35,16 @@ export const invoice606Schema = z.object({
   ncfModificado: z.string().max(19).optional(),
   fechaComprobante: z.string().regex(/^\d{6}$/, "YYYYMM — solo año y mes, ej: 202604"),
   diaComprobante: z.string().regex(/^\d{2}$/, "DD — solo el día, ej: 14"),
-  fechaPago: z.string().regex(/^\d{6}$/, "YYYYMM").optional(),
-  diaPago: z.string().regex(/^\d{2}$/, "DD").optional(),
+  fechaPago: z
+    .string()
+    .regex(/^\d{6}$/, "YYYYMM")
+    .optional()
+    .describe("Fecha de pago/retención. Solo se completa si la factura tiene retención de ITBIS o ISR."),
+  diaPago: z
+    .string()
+    .regex(/^\d{2}$/, "DD")
+    .optional()
+    .describe("Día de pago/retención. Solo se completa si la factura tiene retención de ITBIS o ISR."),
   montoFacturadoServicios: z.number().nonnegative().default(0),
   montoFacturadoBienes: z.number().nonnegative().default(0),
   totalMontoFacturado: z.number().nonnegative(),

@@ -29,8 +29,16 @@ export const invoice607Schema = z.object({
   tipoIngreso: z.enum(tipoIngresoCodes),
   fechaComprobante: z.string().regex(/^\d{6}$/, "YYYYMM — solo año y mes, ej: 202604"),
   diaComprobante: z.string().regex(/^\d{2}$/, "DD — solo el día, ej: 14"),
-  fechaRetencion: z.string().regex(/^\d{6}$/, "YYYYMM").optional(),
-  diaRetencion: z.string().regex(/^\d{2}$/, "DD").optional(),
+  fechaRetencion: z
+    .string()
+    .regex(/^\d{6}$/, "YYYYMM")
+    .optional()
+    .describe("Solo se completa si existe retención de ITBIS o ISR por terceros."),
+  diaRetencion: z
+    .string()
+    .regex(/^\d{2}$/, "DD")
+    .optional()
+    .describe("Solo se completa si existe retención de ITBIS o ISR por terceros."),
   montoFacturado: z.number().nonnegative(),
   itbisFacturado: z.number().nonnegative().default(0),
   itbisRetenidoTerceros: z.number().nonnegative().default(0),

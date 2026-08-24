@@ -12,6 +12,17 @@ const COLUMNS: Record<Tipo, { key: string; header: string }[]> = {
   "IR17": COLUMNS_IR17,
 };
 
+function columnLetter(columnNumber: number): string {
+  let value = columnNumber;
+  let letters = "";
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    letters = String.fromCharCode(65 + remainder) + letters;
+    value = Math.floor((value - 1) / 26);
+  }
+  return letters;
+}
+
 export type GenerateReportResult = {
   periodo: string;
   tipo: Tipo;
@@ -19,6 +30,39 @@ export type GenerateReportResult = {
   xlsxPathname: string;
   txtPathname: string;
 };
+
+function numberValue(value: unknown): number {
+  return typeof value === "number" ? value : Number.parseFloat(String(value ?? "0")) || 0;
+}
+
+/**
+ * Las fechas secundarias de la herramienta DGII solo corresponden a una
+ * retención. Se eliminan antes de generar ambos archivos para que nunca se
+ * rellenen por accidente en facturas sin retención.
+ */
+function normalizeRetentionDates(tipo: Tipo, row: Record<string, unknown>): Record<string, unknown> {
+  const normalized = { ...row };
+  const hasRetention =
+    tipo === "606"
+      ? normalized.tipoRetencionIsr !== "00" ||
+        numberValue(normalized.itbisRetenido) > 0 ||
+        numberValue(normalized.montoRetencionRenta) > 0
+      : tipo === "607"
+        ? numberValue(normalized.itbisRetenidoTerceros) > 0 ||
+          numberValue(normalized.retencionRentaTerceros) > 0
+        : true;
+
+  if (!hasRetention && tipo === "606") {
+    delete normalized.fechaPago;
+    delete normalized.diaPago;
+  }
+  if (!hasRetention && tipo === "607") {
+    delete normalized.fechaRetencion;
+    delete normalized.diaRetencion;
+  }
+
+  return normalized;
+}
 
 /**
  * Genera .xlsx y .txt desde una lista de filas en memoria (sin leer del Blob).
@@ -34,6 +78,7 @@ export async function generateReport(
   }
 
   const columns = COLUMNS[tipo];
+  const normalizedRows = rows.map((row) => normalizeRetentionDates(tipo, row));
 
   function cellValue(row: Record<string, unknown>, header: string): string {
     // Find the column key by header
@@ -46,33 +91,57 @@ export async function generateReport(
   }
 
   const workbook = new ExcelJS.Workbook();
+  workbook.calcProperties.fullCalcOnLoad = true;
   const sheet = workbook.addWorksheet(`Formato ${tipo}`);
+  const totalAmountColumn =
+    columns.findIndex((column) => column.key === "totalMontoFacturado") + 1 ||
+    columns.findIndex((column) => column.key === "montoFacturado") + 1;
+  const sumColumn = columns.length + 1;
 
   // Header row
-  const headerRow = sheet.addRow(columns.map((c) => c.header));
+  const headerRow = sheet.addRow([...columns.map((c) => c.header), "Sumatoria"]);
   headerRow.font = { bold: true };
   headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFF6600" } };
   headerRow.alignment = { horizontal: "center" };
 
   // Data rows (add line numbers)
-  rows.forEach((row, idx) => {
-    sheet.addRow(
+  normalizedRows.forEach((row, idx) => {
+    const dataRow = sheet.addRow(
       columns.map((c) => {
         if (c.key === "lineas") return String(idx + 1);
         if (c.key === "estatus") return "";
         return cellValue(row, c.header);
       })
     );
+    if (totalAmountColumn > 0) {
+      dataRow.getCell(sumColumn).value = {
+        formula: dataRow.getCell(totalAmountColumn).address,
+      };
+      dataRow.getCell(sumColumn).numFmt = "#,##0.00";
+    }
   });
 
+  // Columna auxiliar visible en Excel: facilita revisar cada total de factura y
+  // una suma final del lote sin modificar las columnas oficiales de la DGII.
+  if (tipo !== "IR17" && normalizedRows.length > 0 && totalAmountColumn > 0) {
+    const totalRow = sheet.addRow(columns.map(() => ""));
+    totalRow.getCell(Math.max(1, sumColumn - 1)).value = "TOTAL FACTURAS";
+    totalRow.getCell(sumColumn).value = {
+      formula: `SUM(${columnLetter(sumColumn)}2:${columnLetter(sumColumn)}${totalRow.number - 1})`,
+    };
+    totalRow.getCell(sumColumn).numFmt = "#,##0.00";
+    totalRow.font = { bold: true };
+    totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0F2FE" } };
+  }
+
   // Totals row for IR17
-  if (tipo === "IR17" && rows.length > 0) {
+  if (tipo === "IR17" && normalizedRows.length > 0) {
     const numericKeys = new Set(["baseImponible", "retencionISR", "itbis", "totalFacturado", "aPagar"]);
     const totalsRow = sheet.addRow(
       columns.map((c) => {
         if (c.key === "rncCedula") return "TOTALES";
         if (numericKeys.has(c.key as string)) {
-          const sum = rows.reduce((acc, r) => {
+          const sum = normalizedRows.reduce((acc, r) => {
             const v = r[c.key as string];
             return acc + (typeof v === "number" ? v : parseFloat(String(v ?? "0")) || 0);
           }, 0);
@@ -86,7 +155,7 @@ export async function generateReport(
   }
 
   // Column widths
-  columns.forEach((_, idx) => {
+  [...columns, { key: "sumatoria", header: "Sumatoria" }].forEach((_, idx) => {
     sheet.getColumn(idx + 1).width = 20;
   });
 
@@ -95,7 +164,7 @@ export async function generateReport(
   // TXT: excluir columnas auxiliares
   const skipKeys = new Set(["lineas", "estatus", "proveedor", "cliente", "nombre"]);
   const txtColumns = columns.filter((c) => !skipKeys.has(c.key as string));
-  const txtLines = rows.map((row) =>
+  const txtLines = normalizedRows.map((row) =>
     txtColumns.map((c) => cellValue(row, c.header)).join("|")
   );
   const txtContent = txtLines.join("\r\n") + (txtLines.length ? "\r\n" : "");

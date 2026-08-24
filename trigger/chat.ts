@@ -147,16 +147,23 @@ INSTRUCCIÓN PRINCIPAL — una sola llamada de tool con todo el lote:
 
    CAMPOS POR FACTURA (606/607):
    · proveedor/cliente: nombre del emisor o receptor
-   · rncCedula: RNC del emisor (9 dígitos) — tipoId "1"
-   · tipoBienesServicios: código 01-11 según el tipo de gasto
+   · rncCedula y tipoId: RNC de 9 dígitos → tipoId "1"; cédula de 11 dígitos → tipoId "2". Si el usuario eligió el filtro de tipo de identificación, úsalo exactamente.
+   · tipoBienesServicios (solo 606): usa el filtro elegido por el usuario si aparece en su mensaje. Si no eligió filtro, clasifica según la factura usando exclusivamente este catálogo: 01=Gastos de personal; 02=Trabajos, suministros y servicios; 03=Arrendamientos; 04=Activos fijos; 05=Representación; 06=Otras deducciones admitidas; 07=Gastos financieros; 08=Gastos extraordinarios; 09=Costos de venta; 10=Adquisiciones de activos; 11=Seguros.
    · ncf: número de comprobante fiscal PROPIO de este documento
    · ncfModificado: si es nota de crédito/débito, NCF original que modifica; si no, vacío
    · fechaComprobante: SOLO año+mes YYYYMM (ej: "14/04/26" → "202604")
    · diaComprobante: SOLO el día DD (ej: "14/04/26" → "14")
    · totalMontoFacturado: monto total
    · itbisFacturado: ITBIS (si hay dos cifras, el menor suele ser el ITBIS)
-   · formaPago: 01=efectivo, 02=cheque/transferencia, 03=tarjeta, 04=crédito
+   · formaPago (solo 606): usa el filtro elegido por el usuario si aparece en su mensaje. Si no eligió filtro, lee la factura y usa: 01=Efectivo, 02=Cheques/Transferencias/Depósito, 03=Tarjeta crédito/débito, 04=Compra a crédito, 05=Permuta, 06=Nota de crédito, 07=Mixto.
+   · tipoRetencionIsr (solo 606): usa el filtro elegido por el usuario si aparece en su mensaje. Si no eligió filtro, lee la factura y usa: 00=Ninguna, 01=Alquileres, 02=Honorarios por servicios, 03=Otras rentas, 04=Otras rentas presuntas, 05=Intereses a personas jurídicas, 06=Intereses a personas físicas, 07=Proveedores del Estado, 08=Juegos telefónicos, 09=Retenciones subsector de ganadería de carne bovina.
    · Si un campo no aparece: usa 0 o vacío. Si es ilegible: "ILEGIBLE". NO preguntes jamás.
+
+   FECHAS DE RETENCIÓN — REGLA OBLIGATORIA:
+   · La fechaComprobante y el diaComprobante siempre corresponden a la fecha de la factura.
+   · 606: SOLO agrega fechaPago y diaPago cuando esta factura tenga retención de ITBIS o ISR. Si no hay retención, OMITE ambos campos para que queden vacíos.
+   · 607: SOLO agrega fechaRetencion y diaRetencion cuando exista retención de ITBIS o ISR por terceros. Si no hay retención, OMITE ambos campos para que queden vacíos.
+   · Cuando hay retención, usa la fecha real en que se practicó la retención; no copies la fecha de comprobante salvo que el documento indique que ambas coinciden.
 
    NOTAS DE CRÉDITO / DÉBITO:
    - Tienen su propio NCF (B04...). El ncfModificado es el NCF de la factura original (B01...).
