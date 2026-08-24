@@ -10,6 +10,7 @@ import {
   appendInvoice606,
   appendInvoice607,
   appendInvoiceIR17,
+  clearRecords,
   listInvoices,
 } from "@/lib/dgii/store";
 import { generateReport } from "@/lib/dgii/generateReport";
@@ -44,6 +45,18 @@ const tools = {
     execute: async (input) => {
       const lineas = await appendInvoiceIR17(input);
       return { ok: true, lineas, tipo: "IR17" as const };
+    },
+  }),
+
+  clearRecords: tool({
+    description:
+      "Limpia todos los registros guardados de un tipo (606, 607 o IR17) para empezar un lote nuevo desde cero. SIEMPRE llamar esto PRIMERO antes de registrar cualquier factura del lote.",
+    inputSchema: z.object({
+      tipo: z.enum(["606", "607", "IR17"]),
+    }),
+    execute: async ({ tipo }) => {
+      await clearRecords(tipo);
+      return { ok: true, tipo, mensaje: `Registros de ${tipo} limpiados. Listo para nuevo lote.` };
     },
   }),
 
@@ -122,6 +135,10 @@ function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
 const SYSTEM_PROMPT_BASE = `Eres NALA (Núcleo Automatizado de Listados Administrativos), un asistente de Save Consultores, S.R.L. que automatiza la preparación de información para la DGII procesando facturas y retenciones (formatos 606, 607 e IR-17) de República Dominicana.
 
 REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes documentos:
+
+0. LIMPIA PRIMERO: antes de registrar cualquier factura del lote, llama clearRecords con el tipo
+   correspondiente. Esto garantiza que el reporte final contenga SOLO las facturas de este lote,
+   sin mezclar con lotes anteriores.
 
 1. TIPO: viene en el mensaje del usuario:
    - "Esta factura es una COMPRA" → 606 → usa recordPurchase606

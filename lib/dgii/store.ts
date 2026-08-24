@@ -127,3 +127,12 @@ export async function appendInvoice607(record: Invoice607): Promise<number> {
 export async function appendInvoiceIR17(record: InvoiceIR17): Promise<number> {
   return appendRow("IR17", record);
 }
+
+/** Borra todos los registros de un tipo para empezar un lote limpio. */
+export async function clearRecords(tipo: Tipo): Promise<void> {
+  return withWriteLock(tipo, async () => {
+    const columns = COLUMNS[tipo];
+    const headerLine = Papa.unparse([columns.map((c) => c.header)], { header: false });
+    await writeBlobText(csvPathname(tipo), headerLine + "\n", "text/csv");
+  });
+}

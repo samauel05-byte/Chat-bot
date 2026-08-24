@@ -12,6 +12,7 @@ import Markdown from "react-markdown";
 const TOOL_LABELS: Record<string, string> = {
   getCompanyConfig: "🔍 Revisando los datos de tu empresa",
   setCompanyConfig: "🏢 Guardando los datos de tu empresa",
+  clearRecords: "🗑️ Preparando nuevo lote…",
   recordPurchase606: "🧾 Guardando factura de compra (606)",
   recordSale607: "🧾 Guardando factura de venta (607)",
   recordRetentionIR17: "🏦 Guardando retención IR-17",
