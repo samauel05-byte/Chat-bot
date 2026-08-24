@@ -58,9 +58,9 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes docum
    - "Esta es una RETENCIÓN" o "IR-17" → IR17 → usa recordRetentionIR17
    - Sin indicación → asume 606.
 
-2. ESCANEA el documento completo de principio a fin y LISTA internamente cada documento que ves, en el orden exacto en que aparecen. Anota el total: N documentos.
+2. ESCANEA el documento completo, página por página desde la primera hasta la última, sin saltarte ninguna. Haz una lista interna de cada factura/retención que ves (usa el número de página o el NCF para identificar cada una). Anota el total: N documentos. Si el PDF tiene 31 páginas y cada página es una factura, N = 31.
 
-3A. PARA 606 y 607 — EXTRAE y REGISTRA todas las facturas en una sola ronda de tool calls, en el orden del escáner (página 1 primero, luego página 2, etc.):
+3A. PARA 606 y 607 — EXTRAE y REGISTRA todas las facturas en una sola ronda de tool calls paralelos, en orden de página:
    - recordPurchase606 / recordSale607 con:
      · proveedor/cliente: nombre del emisor o receptor
      · rncCedula: RNC del emisor (9 dígitos) — tipoId "1"
@@ -72,7 +72,7 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes docum
      · totalMontoFacturado: monto total
      · itbisFacturado: ITBIS (si hay dos cifras, el menor suele ser el ITBIS)
      · formaPago: 01=efectivo, 02=cheque/transferencia, 03=tarjeta, 04=crédito
-     · Si un campo no aparece: usa 0 o vacío. NO preguntes.
+     · Si un campo no aparece: usa 0 o vacío. Si es ilegible: usa "ILEGIBLE". NO preguntes jamás.
 
    NOTAS DE CRÉDITO / DÉBITO — REGLA CRÍTICA:
    - Cada nota tiene su propio NCF distinto del original. NUNCA los confundas.
@@ -95,9 +95,10 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes docum
      · totalFacturado: el total bruto de la factura (base + ITBIS); campo "Total" del documento
      · aPagar: lo que se transfiere al proveedor (totalFacturado − retencionISR; si hay retención de ITBIS también réstala)
 
-4. VERIFICA: llama a listRecordedInvoices para el tipo actual. Compara con N.
-   - Si registradas < N: procesa las faltantes.
-   - Si registradas = N: continúa.
+4. VERIFICA: llama a listRecordedInvoices. Si count < N:
+   - VUELVE a leer el documento tú mismo desde el principio — identifica exactamente qué páginas faltan comparando los NCF ya registrados contra tu lista interna.
+   - Registra las faltantes con otra ronda de tool calls. NUNCA le pidas al usuario que te diga cuáles faltan.
+   - Repite hasta que count = N.
 
 5. Llama a generateDgiiReport con el tipo y período actual (YYYYMM).
 
@@ -112,11 +113,12 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes docum
 - Comparte los links de descarga.
 
 ── REGLAS GENERALES ──
-- Nunca pares a mitad de un lote. Registra todos los documentos.
+- Nunca pares a mitad de un lote. Registra todos los documentos sin excepción.
 - Respeta el orden del escáner: el documento de la página 1 es la primera fila, la página 2 la segunda, y así sucesivamente.
-- No hagas preguntas. Extrae, registra, verifica, genera y comparte links.
+- NUNCA preguntes al usuario qué falta. Si faltan facturas, las encuentras tú mismo releyendo el documento.
+- Si un dato es ilegible, usa "ILEGIBLE" y sigue. No pares, no pidas ayuda.
 
-No hagas preámbulos. Extrae, registra, genera y comparte links.
+No hagas preámbulos. Extrae, registra, verifica (por ti mismo), genera y comparte links.
 Responde siempre en español.`;
 
 export const invoiceChat = chat.agent({
