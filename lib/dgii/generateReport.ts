@@ -4,6 +4,12 @@ import { randomUUID } from "node:crypto";
 import { COLUMNS_606 } from "./schema606";
 import { COLUMNS_607 } from "./schema607";
 import { COLUMNS_IR17 } from "./schemaIR17";
+import {
+  FORMA_PAGO_606,
+  TIPO_BIENES_SERVICIOS_606,
+  TIPO_IDENTIFICACION,
+  TIPO_RETENCION_ISR_606,
+} from "./catalogs";
 import { EXPORTS_PREFIX, type Tipo } from "./store";
 
 const COLUMNS: Record<Tipo, { key: string; header: string }[]> = {
@@ -33,6 +39,42 @@ export type GenerateReportResult = {
 
 function numberValue(value: unknown): number {
   return typeof value === "number" ? value : Number.parseFloat(String(value ?? "0")) || 0;
+}
+
+type ExcelList = Record<string, string>;
+
+function displayValue(value: unknown, list?: ExcelList): string {
+  const code = String(value ?? "");
+  return list && code in list ? `${code} - ${list[code]}` : code;
+}
+
+function addExcelDropdown(
+  sheet: ExcelJS.Worksheet,
+  column: number,
+  listColumn: number,
+  values: ExcelList,
+  lastDataRow: number
+) {
+  const listSheet = sheet.workbook.getWorksheet("Listas DGII");
+  if (!listSheet) return;
+
+  const labels = Object.entries(values).map(([code, label]) => `${code} - ${label}`);
+  listSheet.getCell(1, listColumn).value = "Opciones";
+  labels.forEach((label, index) => {
+    listSheet.getCell(index + 2, listColumn).value = label;
+  });
+
+  const source = `'Listas DGII'!$${columnLetter(listColumn)}$2:$${columnLetter(listColumn)}$${labels.length + 1}`;
+  const finalRow = Math.max(lastDataRow + 100, 1000);
+  for (let row = 2; row <= finalRow; row += 1) {
+    sheet.getCell(row, column).dataValidation = {
+      type: "list",
+      allowBlank: true,
+      showErrorMessage: true,
+      errorStyle: "error",
+      formulae: [source],
+    };
+  }
 }
 
 /**
@@ -93,6 +135,7 @@ export async function generateReport(
   const workbook = new ExcelJS.Workbook();
   workbook.calcProperties.fullCalcOnLoad = true;
   const sheet = workbook.addWorksheet(`Formato ${tipo}`);
+  const listSheet = workbook.addWorksheet("Listas DGII", { state: "hidden" });
   const totalAmountColumn =
     columns.findIndex((column) => column.key === "totalMontoFacturado") + 1 ||
     columns.findIndex((column) => column.key === "montoFacturado") + 1;
@@ -110,7 +153,14 @@ export async function generateReport(
       columns.map((c) => {
         if (c.key === "lineas") return String(idx + 1);
         if (c.key === "estatus") return "";
-        return cellValue(row, c.header);
+        const value = cellValue(row, c.header);
+        if (tipo === "606") {
+          if (c.key === "tipoBienesServicios") return displayValue(value, TIPO_BIENES_SERVICIOS_606);
+          if (c.key === "tipoIdentificacion") return displayValue(value, TIPO_IDENTIFICACION);
+          if (c.key === "tipoRetencionIsr") return displayValue(value, TIPO_RETENCION_ISR_606);
+          if (c.key === "formaPago") return displayValue(value, FORMA_PAGO_606);
+        }
+        return value;
       })
     );
     if (totalAmountColumn > 0) {
@@ -132,6 +182,24 @@ export async function generateReport(
     totalRow.getCell(sumColumn).numFmt = "#,##0.00";
     totalRow.font = { bold: true };
     totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0F2FE" } };
+  }
+
+  // Las listas desplegables son parte del Excel de Compras 606, igual que en
+  // la herramienta DGII. La hoja auxiliar queda oculta y no altera el TXT.
+  if (tipo === "606") {
+    const dropdowns: Array<[string, ExcelList]> = [
+      ["tipoBienesServicios", TIPO_BIENES_SERVICIOS_606],
+      ["tipoIdentificacion", TIPO_IDENTIFICACION],
+      ["tipoRetencionIsr", TIPO_RETENCION_ISR_606],
+      ["formaPago", FORMA_PAGO_606],
+    ];
+    dropdowns.forEach(([key, values], index) => {
+      const column = columns.findIndex((item) => item.key === key) + 1;
+      if (column > 0) addExcelDropdown(sheet, column, index + 1, values, normalizedRows.length + 1);
+    });
+    listSheet.state = "veryHidden";
+  } else {
+    workbook.removeWorksheet(listSheet.id);
   }
 
   // Totals row for IR17
