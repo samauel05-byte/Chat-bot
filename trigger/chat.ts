@@ -61,7 +61,11 @@ function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
     const content: UserModelMessage["content"] = [];
     if (cleanText) content.push({ type: "text", text: cleanText });
 
-    for (const f of files) {
+    for (const [index, f] of files.entries()) {
+      content.push({
+        type: "text",
+        text: `Archivo ${index + 1} de ${files.length}: ${f.name}. Procesa este archivo en orden con los demás adjuntos del mismo lote.`,
+      });
       if (f.contentType.startsWith("image/")) {
         content.push({ type: "image", image: new URL(f.url) });
       } else {
@@ -80,9 +84,13 @@ const tools = {
       "Recibe el array COMPLETO de todas las facturas de COMPRA extraídas del documento y genera el reporte 606 de una sola vez. Incluye TODAS las facturas en un único llamado — no llames este tool varias veces.",
     inputSchema: z.object({
       periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM del período, ej. 202607"),
+      cantidadEsperada: z.number().int().positive().optional().describe("Cantidad de facturas indicada explícitamente por el usuario, si la proporcionó"),
       facturas: z.array(invoice606Schema).min(1).describe("Array con TODAS las facturas de compra del documento"),
     }),
-    execute: async ({ periodo, facturas }) => {
+    execute: async ({ periodo, cantidadEsperada, facturas }) => {
+      if (cantidadEsperada !== undefined && facturas.length !== cantidadEsperada) {
+        throw new Error(`Control de completitud: se esperaban ${cantidadEsperada} facturas y se extrajeron ${facturas.length}. No se generó un reporte parcial.`);
+      }
       const result = await generateReport("606", periodo, facturas as Record<string, unknown>[]);
       return {
         ...result,
@@ -97,9 +105,13 @@ const tools = {
       "Recibe el array COMPLETO de todas las facturas de VENTA extraídas del documento y genera el reporte 607 de una sola vez. Incluye TODAS las facturas en un único llamado.",
     inputSchema: z.object({
       periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM del período, ej. 202607"),
+      cantidadEsperada: z.number().int().positive().optional().describe("Cantidad de facturas indicada explícitamente por el usuario, si la proporcionó"),
       facturas: z.array(invoice607Schema).min(1).describe("Array con TODAS las facturas de venta del documento"),
     }),
-    execute: async ({ periodo, facturas }) => {
+    execute: async ({ periodo, cantidadEsperada, facturas }) => {
+      if (cantidadEsperada !== undefined && facturas.length !== cantidadEsperada) {
+        throw new Error(`Control de completitud: se esperaban ${cantidadEsperada} facturas y se extrajeron ${facturas.length}. No se generó un reporte parcial.`);
+      }
       const result = await generateReport("607", periodo, facturas as Record<string, unknown>[]);
       return {
         ...result,
@@ -144,6 +156,8 @@ INSTRUCCIÓN PRINCIPAL — una sola llamada de tool con todo el lote:
    - generateReportIR17 recibe "retenciones": [ {...}, {...}, ... ]
    - Si el PDF tiene 31 páginas con una factura cada una → el array tiene 31 elementos.
    - NUNCA llames el tool más de una vez para el mismo documento.
+   - Si hay varios adjuntos llamados "parte-X-de-Y", forman un único expediente: procesa TODAS las partes en orden y no omitas ninguna página.
+   - Si el usuario indicó una cantidad (por ejemplo, "77 facturas"), incluye cantidadEsperada: 77. Antes de llamar el tool, cuenta que el array tenga exactamente esa cantidad. Si no coincide, vuelve a revisar las partes faltantes; NUNCA entregues un reporte parcial.
 
    CAMPOS POR FACTURA (606/607):
    · proveedor/cliente: nombre del emisor o receptor

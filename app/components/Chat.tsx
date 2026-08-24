@@ -17,6 +17,7 @@ const TOOL_LABELS: Record<string, string> = {
 
 const MAX_FILES = 25;
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const PDF_PAGES_PER_PART = 10;
 const ACCEPTED_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -30,6 +31,46 @@ const ACCEPTED_TYPES = new Set([
 function toolLabel(toolType: string) {
   const name = toolType.replace("tool-", "");
   return TOOL_LABELS[name] ?? `⚙ ${name}`;
+}
+
+async function splitLongPdf(file: File): Promise<File[]> {
+  if (file.type !== "application/pdf") return [file];
+
+  try {
+    const { PDFDocument } = await import("pdf-lib");
+    const source = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+    const pageCount = source.getPageCount();
+    if (pageCount <= PDF_PAGES_PER_PART) return [file];
+
+    const partCount = Math.ceil(pageCount / PDF_PAGES_PER_PART);
+    const extension = file.name.toLowerCase().endsWith(".pdf") ? ".pdf" : "";
+    const baseName = extension ? file.name.slice(0, -extension.length) : file.name;
+    const parts: File[] = [];
+
+    for (let start = 0; start < pageCount; start += PDF_PAGES_PER_PART) {
+      const part = await PDFDocument.create();
+      const pageIndexes = Array.from(
+        { length: Math.min(PDF_PAGES_PER_PART, pageCount - start) },
+        (_, index) => start + index
+      );
+      const copiedPages = await part.copyPages(source, pageIndexes);
+      copiedPages.forEach((page) => part.addPage(page));
+      const partNumber = Math.floor(start / PDF_PAGES_PER_PART) + 1;
+      const bytes = await part.save();
+      const pdfPart = new Blob([bytes as unknown as BlobPart], { type: "application/pdf" });
+      parts.push(
+        new File([pdfPart], `${baseName}_parte-${partNumber}-de-${partCount}.pdf`, {
+          type: "application/pdf",
+          lastModified: file.lastModified,
+        })
+      );
+    }
+
+    return parts;
+  } catch (error) {
+    console.warn("No se pudo dividir el PDF; se enviará completo.", error);
+    return [file];
+  }
 }
 
 export function Chat() {
@@ -134,8 +175,11 @@ export function Chat() {
     if (hasFiles) {
       setIsUploading(true);
       try {
+        const preparedFiles = (
+          await Promise.all(Array.from(files).map((file) => splitLongPdf(file)))
+        ).flat();
         const uploaded = await Promise.all(
-          Array.from(files).map(async (file) => {
+          preparedFiles.map(async (file) => {
             const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
             // Upload directly from browser to Vercel Blob CDN (bypasses 4.5 MB serverless limit)
             const blob = await upload(`uploads/${safeName}`, file, {
