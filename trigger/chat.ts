@@ -3,9 +3,9 @@ import { streamText, stepCountIs, tool, type ModelMessage, type UserModelMessage
 import { anthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
 
-import { invoice606Schema, type Invoice606 } from "@/lib/dgii/schema606";
-import { invoice607Schema, type Invoice607 } from "@/lib/dgii/schema607";
-import { invoiceIR17Schema, type InvoiceIR17 } from "@/lib/dgii/schemaIR17";
+import { invoice606Schema } from "@/lib/dgii/schema606";
+import { invoice607Schema } from "@/lib/dgii/schema607";
+import { invoiceIR17Schema } from "@/lib/dgii/schemaIR17";
 import { generateReport } from "@/lib/dgii/generateReport";
 
 const MODEL = "claude-sonnet-5-20251001";
@@ -48,145 +48,112 @@ function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
   });
 }
 
+// Herramientas: una sola llamada con el array completo → sin acumulación posible.
+const tools = {
+  generateReport606: tool({
+    description:
+      "Recibe el array COMPLETO de todas las facturas de COMPRA extraídas del documento y genera el reporte 606 de una sola vez. Incluye TODAS las facturas en un único llamado — no llames este tool varias veces.",
+    inputSchema: z.object({
+      periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM del período, ej. 202607"),
+      facturas: z.array(invoice606Schema).min(1).describe("Array con TODAS las facturas de compra del documento"),
+    }),
+    execute: async ({ periodo, facturas }) => {
+      const result = await generateReport("606", periodo, facturas as Record<string, unknown>[]);
+      return {
+        ...result,
+        xlsxUrl: `/api/exports/606_${periodo}.xlsx`,
+        txtUrl: `/api/exports/606_${periodo}.txt`,
+      };
+    },
+  }),
+
+  generateReport607: tool({
+    description:
+      "Recibe el array COMPLETO de todas las facturas de VENTA extraídas del documento y genera el reporte 607 de una sola vez. Incluye TODAS las facturas en un único llamado.",
+    inputSchema: z.object({
+      periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM del período, ej. 202607"),
+      facturas: z.array(invoice607Schema).min(1).describe("Array con TODAS las facturas de venta del documento"),
+    }),
+    execute: async ({ periodo, facturas }) => {
+      const result = await generateReport("607", periodo, facturas as Record<string, unknown>[]);
+      return {
+        ...result,
+        xlsxUrl: `/api/exports/607_${periodo}.xlsx`,
+        txtUrl: `/api/exports/607_${periodo}.txt`,
+      };
+    },
+  }),
+
+  generateReportIR17: tool({
+    description:
+      "Recibe el array COMPLETO de todas las retenciones IR-17 extraídas del documento y genera el reporte de una sola vez. Incluye TODAS las retenciones en un único llamado.",
+    inputSchema: z.object({
+      periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM del período, ej. 202607"),
+      retenciones: z.array(invoiceIR17Schema).min(1).describe("Array con TODAS las retenciones del documento"),
+    }),
+    execute: async ({ periodo, retenciones }) => {
+      const result = await generateReport("IR17", periodo, retenciones as Record<string, unknown>[]);
+      return {
+        ...result,
+        xlsxUrl: `/api/exports/IR17_${periodo}.xlsx`,
+        txtUrl: `/api/exports/IR17_${periodo}.txt`,
+      };
+    },
+  }),
+};
+
 const SYSTEM_PROMPT_BASE = `Eres NALA (Núcleo Automatizado de Listados Administrativos), un asistente de Save Consultores, S.R.L. que automatiza la preparación de información para la DGII procesando facturas y retenciones (formatos 606, 607 e IR-17) de República Dominicana.
 
-REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes documentos:
+INSTRUCCIÓN PRINCIPAL — una sola llamada de tool con todo el lote:
 
 1. TIPO: viene en el mensaje del usuario:
-   - "Esta factura es una COMPRA" → 606 → usa recordPurchase606
-   - "Esta factura es una VENTA" → 607 → usa recordSale607
-   - "Esta es una RETENCIÓN" o "IR-17" → IR17 → usa recordRetentionIR17
-   - Sin indicación → asume 606.
+   - "Esta factura es una COMPRA" o sin indicación → 606 → usa generateReport606
+   - "Esta factura es una VENTA" → 607 → usa generateReport607
+   - "Esta es una RETENCIÓN" o "IR-17" → IR17 → usa generateReportIR17
 
-2. ESCANEA el documento completo, página por página desde la primera hasta la última, sin saltarte ninguna. Haz una lista interna de cada factura/retención que ves (usa el número de página o el NCF para identificar cada una). Anota el total: N documentos. Si el PDF tiene 31 páginas y cada página es una factura, N = 31.
+2. LEE el documento completo, página por página, de principio a fin. Extrae los datos de CADA factura/retención que ves.
 
-3A. PARA 606 y 607 — EXTRAE y REGISTRA todas las facturas en una sola ronda de tool calls paralelos, en orden de página:
-   - recordPurchase606 / recordSale607 con:
-     · proveedor/cliente: nombre del emisor o receptor
-     · rncCedula: RNC del emisor (9 dígitos) — tipoId "1"
-     · tipoBienesServicios: código 01-11 según el tipo de gasto
-     · ncf: número de comprobante fiscal PROPIO de este documento
-     · ncfModificado: si es nota de crédito/débito, pon aquí el NCF que modifica; si no, vacío
-     · fechaComprobante: SOLO año+mes YYYYMM (ej: "14/04/26" → "202604")
-     · diaComprobante: SOLO el día DD (ej: "14/04/26" → "14")
-     · totalMontoFacturado: monto total
-     · itbisFacturado: ITBIS (si hay dos cifras, el menor suele ser el ITBIS)
-     · formaPago: 01=efectivo, 02=cheque/transferencia, 03=tarjeta, 04=crédito
-     · Si un campo no aparece: usa 0 o vacío. Si es ilegible: usa "ILEGIBLE". NO preguntes jamás.
+3. Llama al tool UNA SOLA VEZ con el array completo de todas las facturas extraídas.
+   - generateReport606 / generateReport607 reciben "facturas": [ {...}, {...}, ... ]
+   - generateReportIR17 recibe "retenciones": [ {...}, {...}, ... ]
+   - Si el PDF tiene 31 páginas con una factura cada una → el array tiene 31 elementos.
+   - NUNCA llames el tool más de una vez para el mismo documento.
 
-   NOTAS DE CRÉDITO / DÉBITO — REGLA CRÍTICA:
-   - Cada nota tiene su propio NCF distinto del original. NUNCA los confundas.
-   - Registra TODOS los documentos. Si el lote tiene N, haz exactamente N llamadas.
+   CAMPOS POR FACTURA (606/607):
+   · proveedor/cliente: nombre del emisor o receptor
+   · rncCedula: RNC del emisor (9 dígitos) — tipoId "1"
+   · tipoBienesServicios: código 01-11 según el tipo de gasto
+   · ncf: número de comprobante fiscal PROPIO de este documento
+   · ncfModificado: si es nota de crédito/débito, NCF original que modifica; si no, vacío
+   · fechaComprobante: SOLO año+mes YYYYMM (ej: "14/04/26" → "202604")
+   · diaComprobante: SOLO el día DD (ej: "14/04/26" → "14")
+   · totalMontoFacturado: monto total
+   · itbisFacturado: ITBIS (si hay dos cifras, el menor suele ser el ITBIS)
+   · formaPago: 01=efectivo, 02=cheque/transferencia, 03=tarjeta, 04=crédito
+   · Si un campo no aparece: usa 0 o vacío. Si es ilegible: "ILEGIBLE". NO preguntes jamás.
 
-3B. PARA IR-17 — EXTRAE y REGISTRA cada retención de ISR:
-   Los documentos llegan como facturas de proveedores o proformas de pago. Busca estas líneas clave:
-   - "Retención X% ISR (LeyXX-XX)" → monto del ISR retenido
-   - "ISR: -RD$ XXX" → monto del ISR en proformas de nómina
-   - "Ret 100% ITBIS P. F." → retención de ITBIS (NO va en IR-17, va en 606)
+   NOTAS DE CRÉDITO / DÉBITO:
+   - Tienen su propio NCF (B04...). El ncfModificado es el NCF de la factura original (B01...).
+   - Registra nota y factura original como elementos separados en el array.
 
-   recordRetentionIR17 con:
-     · nombre: nombre completo del contratista/proveedor que recibió el pago
-     · rncCedula: su Cédula (11 dígitos, tipoId "2") o RNC (9 dígitos, tipoId "1")
-     · ncf: el NCF del comprobante (ej: E410000000050), si existe; sino omite
-     · periodo: YYYYMM de la fecha del documento
-     · baseImponible: el SUBTOTAL (antes de ITBIS e ISR) — campo "Subtotal" o "Base"
-     · retencionISR: el monto exacto del ISR retenido (campo "Retención X% ISR" o "ISR")
-     · itbis: el monto del ITBIS calculado (campo "18% ITBIS" o "ITBIS"; si no aparece, 0)
-     · totalFacturado: el total bruto de la factura (base + ITBIS); campo "Total" del documento
-     · aPagar: lo que se transfiere al proveedor (totalFacturado − retencionISR; si hay retención de ITBIS también réstala)
+4. Una vez el tool responda con xlsxUrl y txtUrl, muestra un resumen en tabla:
+   #, Proveedor, NCF, Fecha, Monto, ITBIS
 
-4. VERIFICA: llama a listRecordedInvoices. Si count < N:
-   - VUELVE a leer el documento tú mismo desde el principio — identifica exactamente qué páginas faltan comparando los NCF ya registrados contra tu lista interna.
-   - Registra las faltantes con otra ronda de tool calls. NUNCA le pidas al usuario que te diga cuáles faltan.
-   - Repite hasta que count = N.
-
-5. Llama a generateDgiiReport con el tipo y período actual (YYYYMM).
-
-6. Muestra un resumen breve en tabla con los campos principales.
-
-7. Comparte los links de descarga como markdown:
-   [📥 Descargar Excel](/api/exports/606_YYYYMM.xlsx) | [📄 Descargar TXT](/api/exports/606_YYYYMM.txt)
-   (reemplaza el tipo —606, 607 o IR17— y YYYYMM con los valores reales).
+5. Comparte los links de descarga:
+   [📥 Descargar Excel](xlsxUrl) | [📄 Descargar TXT](txtUrl)
+   (usa exactamente los valores xlsxUrl y txtUrl que devolvió el tool)
 
 ── CUANDO EL USUARIO PIDE "GENERAR REPORTE" MANUALMENTE ──
-- Llama a generateDgiiReport para el tipo y período indicado (si no indica, mes actual).
-- Comparte los links de descarga.
+- Pídele que suba el documento, o si ya lo subió, extrae y llama el tool con todos los datos.
 
 ── REGLAS GENERALES ──
-- Nunca pares a mitad de un lote. Registra todos los documentos sin excepción.
-- Respeta el orden del escáner: el documento de la página 1 es la primera fila, la página 2 la segunda, y así sucesivamente.
-- NUNCA preguntes al usuario qué falta. Si faltan facturas, las encuentras tú mismo releyendo el documento.
-- Si un dato es ilegible, usa "ILEGIBLE" y sigue. No pares, no pidas ayuda.
-
-No hagas preámbulos. Extrae, registra, verifica (por ti mismo), genera y comparte links.
-Responde siempre en español.`;
+- Una sola llamada al tool por documento. El array contiene todo.
+- NUNCA preguntes al usuario qué falta. NUNCA hagas múltiples llamadas al mismo tool.
+- Responde siempre en español.`;
 
 export const invoiceChat = chat.agent({
   id: "invoice-chat",
-  // tools() se ejecuta UNA VEZ POR TURNO — garantiza buffer fresco en cada mensaje.
-  // Esto evita que facturas de un turno anterior se acumulen en el siguiente.
-  tools: () => {
-    const session: {
-      "606": Invoice606[];
-      "607": Invoice607[];
-      "IR17": InvoiceIR17[];
-    } = { "606": [], "607": [], "IR17": [] };
-
-    return {
-      recordPurchase606: tool({
-        description: "Registra una factura de COMPRA (formato 606) en el turno actual.",
-        inputSchema: invoice606Schema,
-        execute: async (input) => {
-          session["606"].push(input);
-          return { ok: true, lineas: session["606"].length, tipo: "606" as const };
-        },
-      }),
-
-      recordSale607: tool({
-        description: "Registra una factura de VENTA (formato 607) en el turno actual.",
-        inputSchema: invoice607Schema,
-        execute: async (input) => {
-          session["607"].push(input);
-          return { ok: true, lineas: session["607"].length, tipo: "607" as const };
-        },
-      }),
-
-      recordRetentionIR17: tool({
-        description: "Registra una retención de ISR (formato IR-17) en el turno actual.",
-        inputSchema: invoiceIR17Schema,
-        execute: async (input) => {
-          session["IR17"].push(input);
-          return { ok: true, lineas: session["IR17"].length, tipo: "IR17" as const };
-        },
-      }),
-
-      listRecordedInvoices: tool({
-        description: "Lista las facturas/retenciones registradas en este turno por tipo (606, 607 o IR17).",
-        inputSchema: z.object({
-          tipo: z.enum(["606", "607", "IR17"]),
-        }),
-        execute: async ({ tipo }) => {
-          return { tipo, count: session[tipo].length, records: session[tipo] };
-        },
-      }),
-
-      generateDgiiReport: tool({
-        description: "Genera el .xlsx y el .txt con SOLO las facturas subidas en este turno.",
-        inputSchema: z.object({
-          tipo: z.enum(["606", "607", "IR17"]),
-          periodo: z.string().regex(/^\d{6}$/).describe("YYYYMM, ej. 202507"),
-        }),
-        execute: async ({ tipo, periodo }) => {
-          const result = await generateReport(tipo, periodo, session[tipo] as Record<string, unknown>[]);
-          return {
-            ...result,
-            xlsxUrl: `/api/exports/${tipo}_${periodo}.xlsx`,
-            txtUrl: `/api/exports/${tipo}_${periodo}.txt`,
-          };
-        },
-      }),
-    };
-  },
+  tools,
   uiMessageStreamOptions: {
     onError: (error) => {
       console.error("invoice-chat stream error:", error);
