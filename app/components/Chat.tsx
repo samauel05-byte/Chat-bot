@@ -10,14 +10,9 @@ import { upload } from "@vercel/blob/client";
 import Markdown from "react-markdown";
 
 const TOOL_LABELS: Record<string, string> = {
-  getCompanyConfig: "🔍 Revisando los datos de tu empresa",
-  setCompanyConfig: "🏢 Guardando los datos de tu empresa",
-  clearRecords: "🗑️ Preparando nuevo lote…",
-  recordPurchase606: "🧾 Guardando factura de compra (606)",
-  recordSale607: "🧾 Guardando factura de venta (607)",
-  recordRetentionIR17: "🏦 Guardando retención IR-17",
-  listRecordedInvoices: "📋 Revisando las facturas guardadas",
-  generateDgiiReport: "📊 Generando tu reporte",
+  generateReport606: "📊 Generando reporte 606 (compras)…",
+  generateReport607: "📊 Generando reporte 607 (ventas)…",
+  generateReportIR17: "📊 Generando reporte IR-17 (retenciones)…",
 };
 
 function toolLabel(toolType: string) {
@@ -155,6 +150,14 @@ export function Chat() {
             </p>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          title="Iniciar una sesión limpia para un nuevo lote de facturas"
+          className="shrink-0 rounded-full border border-black/10 px-3 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:border-violet-400 hover:bg-violet-50 dark:border-white/15 dark:text-neutral-300 dark:hover:bg-violet-950/30"
+        >
+          🔄 Nuevo lote
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">

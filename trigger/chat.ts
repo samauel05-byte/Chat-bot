@@ -12,8 +12,33 @@ const MODEL = "claude-sonnet-5-20251001";
 
 type FileMeta = { url: string; contentType: string; name: string };
 
+const BATCH_TOOL_NAMES = ["generateReport606", "generateReport607", "generateReportIR17"];
+
 function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
   return messages.map((msg) => {
+    // Strip batch-tool args from assistant history so old invoice arrays never
+    // pollute the next extraction — the model must only use the current attachment.
+    if (msg.role === "assistant" && Array.isArray(msg.content)) {
+      const cleaned = (msg.content as unknown[]).map((part) => {
+        const p = part as Record<string, unknown>;
+        if (p.type === "tool-call" && BATCH_TOOL_NAMES.includes(p.toolName as string)) {
+          const args = p.args as Record<string, unknown>;
+          const count =
+            Array.isArray(args.facturas) ? args.facturas.length :
+            Array.isArray(args.retenciones) ? args.retenciones.length : 0;
+          return {
+            ...p,
+            args: {
+              periodo: args.periodo,
+              _historial: `Lote anterior: ${count} registros ya procesados. NO reutilizar estos datos.`,
+            },
+          };
+        }
+        return part;
+      });
+      return { ...msg, content: cleaned };
+    }
+
     if (msg.role !== "user") return msg;
 
     const rawText =
@@ -111,7 +136,8 @@ INSTRUCCIÓN PRINCIPAL — una sola llamada de tool con todo el lote:
    - "Esta factura es una VENTA" → 607 → usa generateReport607
    - "Esta es una RETENCIÓN" o "IR-17" → IR17 → usa generateReportIR17
 
-2. LEE el documento completo, página por página, de principio a fin. Extrae los datos de CADA factura/retención que ves.
+2. LEE el documento adjunto en el MENSAJE ACTUAL, página por página, de principio a fin. Extrae los datos de CADA factura/retención que ves.
+   ⚠️ SOLO usa los documentos del mensaje actual. NUNCA incluyas datos de mensajes anteriores ni de lotes previos.
 
 3. Llama al tool UNA SOLA VEZ con el array completo de todas las facturas extraídas.
    - generateReport606 / generateReport607 reciben "facturas": [ {...}, {...}, ... ]
