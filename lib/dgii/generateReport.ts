@@ -128,6 +128,15 @@ export async function generateReport(
     if (!col) return "";
     const v = row[col.key as string];
     if (v === undefined || v === null || v === "") return "";
+    if (
+      tipo === "606" &&
+      col.key === "tipoRetencionIsr" &&
+      v === "00" &&
+      numberValue(row.itbisRetenido) === 0 &&
+      numberValue(row.montoRetencionRenta) === 0
+    ) {
+      return "";
+    }
     if (typeof v === "number") return blankZero && v === 0 ? "" : v.toFixed(2);
     return String(v);
   }
