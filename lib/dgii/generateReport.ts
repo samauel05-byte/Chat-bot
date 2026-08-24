@@ -122,22 +122,21 @@ export async function generateReport(
   const columns = COLUMNS[tipo];
   const normalizedRows = rows.map((row) => normalizeRetentionDates(tipo, row));
 
-  function cellValue(row: Record<string, unknown>, header: string): string {
+  function cellValue(row: Record<string, unknown>, header: string, blankZero = false): string {
     // Find the column key by header
     const col = columns.find((c) => c.header === header);
     if (!col) return "";
     const v = row[col.key as string];
     if (v === undefined || v === null || v === "") return "";
-    if (typeof v === "number") return v.toFixed(2);
+    if (typeof v === "number") return blankZero && v === 0 ? "" : v.toFixed(2);
     return String(v);
   }
 
   function excelCellValue(row: Record<string, unknown>, key: string, header: string): string {
     const rawValue = row[key];
-    // Los montos no aplicables se muestran vacíos en el Excel; el TXT conserva
-    // el 0 requerido por DGII cuando corresponda.
+    // Los montos no aplicables se muestran vacíos en los reportes descargados.
     if (typeof rawValue === "number" && rawValue === 0) return "";
-    return cellValue(row, header);
+    return cellValue(row, header, true);
   }
 
   const workbook = new ExcelJS.Workbook();
@@ -164,7 +163,7 @@ export async function generateReport(
         const value = excelCellValue(row, c.key as string, c.header);
         if (tipo === "606") {
           if (c.key === "tipoBienesServicios") return displayValue(value, TIPO_BIENES_SERVICIOS_606);
-          if (c.key === "tipoIdentificacion") return displayValue(value, TIPO_IDENTIFICACION);
+          if (c.key === "tipoId") return displayValue(value, TIPO_IDENTIFICACION);
           if (c.key === "tipoRetencionIsr") return displayValue(value, TIPO_RETENCION_ISR_606);
           if (c.key === "formaPago") return displayValue(value, FORMA_PAGO_606);
         }
@@ -241,7 +240,7 @@ export async function generateReport(
   const skipKeys = new Set(["lineas", "estatus", "proveedor", "cliente", "nombre"]);
   const txtColumns = columns.filter((c) => !skipKeys.has(c.key as string));
   const txtLines = normalizedRows.map((row) =>
-    txtColumns.map((c) => cellValue(row, c.header)).join("|")
+    txtColumns.map((c) => cellValue(row, c.header, true)).join("|")
   );
   const txtContent = txtLines.join("\r\n") + (txtLines.length ? "\r\n" : "");
 
