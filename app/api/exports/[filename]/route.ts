@@ -31,6 +31,8 @@ export async function GET(
     headers: {
       "Content-Type": contentType,
       "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react";
 import type { invoiceChat } from "@/trigger/chat";
@@ -14,6 +14,18 @@ const TOOL_LABELS: Record<string, string> = {
   generateReport607: "📊 Generando reporte 607 (ventas)…",
   generateReportIR17: "📊 Generando reporte IR-17 (retenciones)…",
 };
+
+const MAX_FILES = 25;
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const ACCEPTED_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "application/pdf",
+]);
 
 function toolLabel(toolType: string) {
   const name = toolType.replace("tool-", "");
@@ -36,10 +48,15 @@ export function Chat() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isStreaming = status === "streaming" || status === "submitted";
   const lastMessage = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMessage?.role !== "assistant";
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, showTypingIndicator]);
 
   const MODE_PREFIX: Record<"606" | "607" | "IR17", string> = {
     "606": "Esta factura es una COMPRA: regístrala como formato 606. ",
@@ -48,9 +65,32 @@ export function Chat() {
   };
 
   function mergeFiles(existing: FileList | undefined, incoming: FileList | File[]): FileList {
+    const candidates = [...Array.from(existing ?? []), ...Array.from(incoming)];
+    const invalidType = candidates.find((file) => !ACCEPTED_TYPES.has(file.type));
+    if (invalidType) {
+      setSubmitError(`“${invalidType.name}” no es una imagen o un PDF compatible.`);
+      return existing ?? new DataTransfer().files;
+    }
+    const oversized = candidates.find((file) => file.size > MAX_FILE_SIZE);
+    if (oversized) {
+      setSubmitError(`“${oversized.name}” supera el máximo de 20 MB.`);
+      return existing ?? new DataTransfer().files;
+    }
+    if (candidates.length > MAX_FILES) {
+      setSubmitError(`Puedes procesar hasta ${MAX_FILES} archivos por lote.`);
+      return existing ?? new DataTransfer().files;
+    }
+
     const dt = new DataTransfer();
-    if (existing) for (const f of Array.from(existing)) dt.items.add(f);
-    for (const f of Array.from(incoming)) dt.items.add(f);
+    const seen = new Set<string>();
+    for (const file of candidates) {
+      const fingerprint = `${file.name}:${file.size}:${file.lastModified}`;
+      if (!seen.has(fingerprint)) {
+        seen.add(fingerprint);
+        dt.items.add(file);
+      }
+    }
+    setSubmitError(null);
     return dt.files;
   }
 
@@ -58,6 +98,14 @@ export function Chat() {
     setFiles(undefined);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
+  }
+
+  function resetAfterExcelDownload(href: string | undefined) {
+    if (!href || !/\/api\/exports\/[^?#]+\.xlsx(?:[?#]|$)/i.test(href)) return;
+
+    // The link opens separately; keep this page alive briefly so the browser
+    // can start the download before clearing the current batch and chat.
+    window.setTimeout(() => window.location.reload(), 1200);
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -180,6 +228,7 @@ export function Chat() {
                                 className="font-medium text-violet-600 underline hover:text-violet-800 dark:text-violet-400"
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                onClick={() => resetAfterExcelDownload(href)}
                               >
                                 {children}
                               </a>
@@ -251,10 +300,11 @@ export function Chat() {
           )}
 
           {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400">
-              ⚠️ {error.message}
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400">
+              ⚠️ No pudimos completar el procesamiento. Intenta nuevamente.
             </p>
           )}
+          <div ref={messagesEndRef} />
         </div>
       </div>
 
@@ -269,6 +319,7 @@ export function Chat() {
             </span>
             <button
               type="button"
+              aria-pressed={mode === "606"}
               onClick={() => setMode((m) => (m === "606" ? null : "606"))}
               className={
                 "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
@@ -281,6 +332,7 @@ export function Chat() {
             </button>
             <button
               type="button"
+              aria-pressed={mode === "607"}
               onClick={() => setMode((m) => (m === "607" ? null : "607"))}
               className={
                 "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
@@ -293,6 +345,7 @@ export function Chat() {
             </button>
             <button
               type="button"
+              aria-pressed={mode === "IR17"}
               onClick={() => setMode((m) => (m === "IR17" ? null : "IR17"))}
               className={
                 "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
@@ -332,14 +385,15 @@ export function Chat() {
           )}
 
           {submitError && (
-            <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-400">
+            <p role="alert" className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-400">
               ⚠️ {submitError}
             </p>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-[auto_auto_1fr] items-center gap-2 sm:flex">
             <label
               title="Elegir archivo"
+              aria-label="Elegir archivos"
               className="flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-black/15 p-2.5 text-lg transition-colors hover:border-violet-400 hover:bg-violet-50 dark:border-white/20 dark:hover:bg-violet-950/30"
             >
               📎
@@ -356,6 +410,7 @@ export function Chat() {
             </label>
             <label
               title="Tomar foto con la cámara"
+              aria-label="Tomar foto con la cámara"
               className="flex shrink-0 cursor-pointer items-center justify-center rounded-full border border-dashed border-black/15 p-2.5 text-lg transition-colors hover:border-violet-400 hover:bg-violet-50 dark:border-white/20 dark:hover:bg-violet-950/30"
             >
               📷
@@ -373,14 +428,15 @@ export function Chat() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              aria-label="Mensaje opcional"
               placeholder="Mensaje opcional — o solo adjunta las facturas y da Enviar"
-              className="min-w-0 flex-1 rounded-full border border-black/10 bg-neutral-50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-violet-400 focus:bg-white dark:border-white/15 dark:bg-neutral-800 dark:focus:bg-neutral-800"
+              className="min-w-0 rounded-full border border-black/10 bg-neutral-50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-violet-400 focus:bg-white dark:border-white/15 dark:bg-neutral-800 dark:focus:bg-neutral-800 sm:flex-1"
             />
             {isStreaming ? (
               <button
                 type="button"
                 onClick={stop}
-                className="shrink-0 rounded-full bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                className="col-span-3 shrink-0 rounded-full bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 sm:col-span-1"
               >
                 ■ Detener
               </button>
@@ -388,7 +444,7 @@ export function Chat() {
               <button
                 type="submit"
                 disabled={isUploading}
-                className="shrink-0 rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
+                className="col-span-3 shrink-0 rounded-full bg-violet-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1"
               >
                 {isUploading ? "⏳ Subiendo…" : "Enviar ➤"}
               </button>

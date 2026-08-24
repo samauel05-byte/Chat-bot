@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
       body,
       request: req,
       onBeforeGenerateToken: async () => ({
-        maximumSizeInBytes: 200 * 1024 * 1024, // 200 MB
+        maximumSizeInBytes: 20 * 1024 * 1024,
         addRandomSuffix: true,
         allowedContentTypes: [
           "image/jpeg",

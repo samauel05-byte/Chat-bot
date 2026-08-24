@@ -20,7 +20,10 @@ export async function GET(
   const { path: pathParts } = await params;
   const pathname = pathParts.join("/");
 
-  if (!pathname.startsWith("uploads/")) {
+  if (
+    !pathname.startsWith("uploads/") ||
+    pathParts.some((part) => !part || part === "." || part === ".." || part.includes("\\"))
+  ) {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
 
@@ -33,6 +36,10 @@ export async function GET(
   const contentType = CONTENT_TYPES[ext] ?? "application/octet-stream";
 
   return new NextResponse(result.stream, {
-    headers: { "Content-Type": contentType },
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 }

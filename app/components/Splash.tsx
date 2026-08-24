@@ -52,17 +52,11 @@ export function Splash({ onDone }: { onDone: () => void }) {
       setTimeout(() => setPhase("acronym"), 900),
       setTimeout(() => setPhase("tagline"), 1900),
       setTimeout(() => setPhase("done"), 3400),
+      setTimeout(() => setExiting(true), 3500),
+      setTimeout(onDone, 4200),
     ];
     return () => timers.forEach(clearTimeout);
-  }, []);
-
-  useEffect(() => {
-    if (phase === "done") {
-      setExiting(true);
-      const t = setTimeout(onDone, 700);
-      return () => clearTimeout(t);
-    }
-  }, [phase, onDone]);
+  }, [onDone]);
 
   function skip() {
     if (exiting) return;
@@ -77,8 +71,14 @@ export function Splash({ onDone }: { onDone: () => void }) {
       {!exiting && (
         <motion.div
           key="splash"
+          role="button"
+          tabIndex={0}
+          aria-label="Omitir presentación de NALA"
           className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-violet-950 select-none cursor-pointer overflow-hidden"
           onClick={skip}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") skip();
+          }}
           exit={{ opacity: 0, scale: 1.03 }}
           transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
         >

@@ -86,8 +86,8 @@ const tools = {
       const result = await generateReport("606", periodo, facturas as Record<string, unknown>[]);
       return {
         ...result,
-        xlsxUrl: `/api/exports/606_${periodo}.xlsx`,
-        txtUrl: `/api/exports/606_${periodo}.txt`,
+        xlsxUrl: `/api/exports/${result.xlsxPathname.split("/").at(-1)}`,
+        txtUrl: `/api/exports/${result.txtPathname.split("/").at(-1)}`,
       };
     },
   }),
@@ -103,8 +103,8 @@ const tools = {
       const result = await generateReport("607", periodo, facturas as Record<string, unknown>[]);
       return {
         ...result,
-        xlsxUrl: `/api/exports/607_${periodo}.xlsx`,
-        txtUrl: `/api/exports/607_${periodo}.txt`,
+        xlsxUrl: `/api/exports/${result.xlsxPathname.split("/").at(-1)}`,
+        txtUrl: `/api/exports/${result.txtPathname.split("/").at(-1)}`,
       };
     },
   }),
@@ -120,8 +120,8 @@ const tools = {
       const result = await generateReport("IR17", periodo, retenciones as Record<string, unknown>[]);
       return {
         ...result,
-        xlsxUrl: `/api/exports/IR17_${periodo}.xlsx`,
-        txtUrl: `/api/exports/IR17_${periodo}.txt`,
+        xlsxUrl: `/api/exports/${result.xlsxPathname.split("/").at(-1)}`,
+        txtUrl: `/api/exports/${result.txtPathname.split("/").at(-1)}`,
       };
     },
   }),
