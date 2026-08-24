@@ -58,9 +58,9 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes docum
    - "Esta es una RETENCIÓN" o "IR-17" → IR17 → usa recordRetentionIR17
    - Sin indicación → asume 606.
 
-2. ESCANEA el documento completo de principio a fin y LISTA internamente cada documento que ves. Anota el total: N documentos.
+2. ESCANEA el documento completo de principio a fin y LISTA internamente cada documento que ves, en el orden exacto en que aparecen. Anota el total: N documentos.
 
-3A. PARA 606 y 607 — EXTRAE y REGISTRA cada factura:
+3A. PARA 606 y 607 — EXTRAE y REGISTRA cada factura ESTRICTAMENTE en el orden del escáner (página 1 → página 2 → … → última). Registra una, espera confirmación del tool call, luego pasa a la siguiente:
    - recordPurchase606 / recordSale607 con:
      · proveedor/cliente: nombre del emisor o receptor
      · rncCedula: RNC del emisor (9 dígitos) — tipoId "1"
@@ -113,6 +113,7 @@ REGLAS PRINCIPALES — síguelas en este orden exacto cada vez que recibes docum
 
 ── REGLAS GENERALES ──
 - Nunca pares a mitad de un lote. Registra todos los documentos.
+- Respeta el orden del escáner: el documento de la página 1 es la primera fila, la página 2 la segunda, y así sucesivamente.
 - No hagas preguntas. Extrae, registra, verifica, genera y comparte links.
 
 No hagas preámbulos. Extrae, registra, genera y comparte links.
@@ -197,9 +198,9 @@ export const invoiceChat = chat.agent({
     };
 
     return streamText({
+      ...chat.toStreamTextOptions({ tools }),
       model: anthropic(MODEL),
       system: SYSTEM_PROMPT_BASE,
-      tools,
       messages: preprocessMessages(messages),
       abortSignal: signal,
       stopWhen: stepCountIs(2000),
