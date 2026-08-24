@@ -185,6 +185,16 @@ export async function generateReport(
       };
       dataRow.getCell(sumColumn).numFmt = "#,##0.00";
     }
+    if (tipo === "606" || tipo === "607") {
+      const color = idx % 2 === 0 ? "FFDDEBF7" : "FFFFFFFF";
+      for (let column = 1; column <= sumColumn; column += 1) {
+        dataRow.getCell(column).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: color },
+        };
+      }
+    }
   });
 
   // Columna auxiliar visible en Excel: facilita revisar cada total de factura y
