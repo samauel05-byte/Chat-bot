@@ -8,6 +8,12 @@ import type { invoiceChat } from "@/trigger/chat";
 import { mintChatAccessToken, startChatSession } from "@/app/actions/chat";
 import { upload } from "@vercel/blob/client";
 import Markdown from "react-markdown";
+import {
+  FORMA_PAGO_606,
+  TIPO_BIENES_SERVICIOS_606,
+  TIPO_IDENTIFICACION,
+  TIPO_RETENCION_ISR_606,
+} from "@/lib/dgii/catalogs";
 
 const TOOL_LABELS: Record<string, string> = {
   generateReport606: "📊 Generando reporte 606 (compras)…",
@@ -43,6 +49,10 @@ export function Chat() {
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<FileList | undefined>(undefined);
   const [mode, setMode] = useState<"606" | "607" | "IR17" | null>(null);
+  const [purchaseCategory, setPurchaseCategory] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [identificationType, setIdentificationType] = useState("");
+  const [isrRetentionType, setIsrRetentionType] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -129,7 +139,22 @@ export function Chat() {
       return;
     }
 
-    const baseText = mode ? MODE_PREFIX[mode] + input : input;
+    const purchaseFilters =
+      mode !== "607" && mode !== "IR17"
+        ? [
+            purchaseCategory &&
+              `Usa el tipo de bienes y servicios ${purchaseCategory}: ${TIPO_BIENES_SERVICIOS_606[purchaseCategory as keyof typeof TIPO_BIENES_SERVICIOS_606]}. `,
+            paymentMethod &&
+              `Usa la forma de pago ${paymentMethod}: ${FORMA_PAGO_606[paymentMethod as keyof typeof FORMA_PAGO_606]}. `,
+            identificationType &&
+              `Usa el tipo de identificación ${identificationType}: ${TIPO_IDENTIFICACION[identificationType as keyof typeof TIPO_IDENTIFICACION]}. `,
+            isrRetentionType &&
+              `Usa el tipo de retención ISR ${isrRetentionType}: ${TIPO_RETENCION_ISR_606[isrRetentionType as keyof typeof TIPO_RETENCION_ISR_606]}. `,
+          ]
+            .filter(Boolean)
+            .join("")
+        : "";
+    const baseText = (mode ? MODE_PREFIX[mode] : "") + purchaseFilters + input;
 
     if (hasFiles) {
       setIsUploading(true);
@@ -354,6 +379,71 @@ export function Chat() {
               </span>
             )}
           </div>
+
+          {mode !== "607" && mode !== "IR17" && (
+            <div className="mb-2.5 grid gap-2 sm:grid-cols-2">
+              <label className="grid gap-1 text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                Tipo de bienes y servicios
+                <select
+                  value={purchaseCategory}
+                  onChange={(event) => setPurchaseCategory(event.target.value)}
+                  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-normal text-neutral-800 outline-none transition-colors focus:border-violet-400 dark:border-white/15 dark:bg-neutral-800 dark:text-neutral-100"
+                >
+                  <option value="">Detectar según la factura</option>
+                  {Object.entries(TIPO_BIENES_SERVICIOS_606).map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {code} — {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                Forma de pago
+                <select
+                  value={paymentMethod}
+                  onChange={(event) => setPaymentMethod(event.target.value)}
+                  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-normal text-neutral-800 outline-none transition-colors focus:border-violet-400 dark:border-white/15 dark:bg-neutral-800 dark:text-neutral-100"
+                >
+                  <option value="">Detectar según la factura</option>
+                  {Object.entries(FORMA_PAGO_606).map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {code} — {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                Tipo de identificación
+                <select
+                  value={identificationType}
+                  onChange={(event) => setIdentificationType(event.target.value)}
+                  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-normal text-neutral-800 outline-none transition-colors focus:border-violet-400 dark:border-white/15 dark:bg-neutral-800 dark:text-neutral-100"
+                >
+                  <option value="">Detectar RNC o cédula</option>
+                  {Object.entries(TIPO_IDENTIFICACION).map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {code} — {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-medium text-neutral-600 dark:text-neutral-300">
+                Tipo de retención ISR
+                <select
+                  value={isrRetentionType}
+                  onChange={(event) => setIsrRetentionType(event.target.value)}
+                  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-normal text-neutral-800 outline-none transition-colors focus:border-violet-400 dark:border-white/15 dark:bg-neutral-800 dark:text-neutral-100"
+                >
+                  <option value="">Detectar según la factura</option>
+                  {Object.entries(TIPO_RETENCION_ISR_606).map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {code} — {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
 
           {files && files.length > 0 && (
             <div className="mb-2.5 flex items-center gap-2 rounded-lg bg-violet-50 px-3 py-2 text-xs text-violet-800 dark:bg-violet-950/40 dark:text-violet-300">
