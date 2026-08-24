@@ -1,8 +1,19 @@
 import { defineConfig } from "@trigger.dev/sdk";
+import { syncEnvVars } from "@trigger.dev/build/extensions/core";
 
 export default defineConfig({
   project: "proj_hnrxkqoixmmszrwvyexx",
   dirs: ["./trigger"],
+  build: {
+    extensions: [
+      syncEnvVars(async () => {
+        const openaiApiKey = process.env.OPENAI_API_KEY;
+        return openaiApiKey
+          ? [{ name: "OPENAI_API_KEY", value: openaiApiKey, isSecret: true }]
+          : [];
+      }),
+    ],
+  },
   retries: {
     enabledInDev: false,
     default: {

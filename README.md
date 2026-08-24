@@ -9,8 +9,8 @@ como blobs privados (requieren el token para leerse, no son URLs públicas adivi
 
 ## Requisitos antes de correrlo
 
-1. **Clave de Anthropic**: copia `.env.local.example` a `.env.local` (o edita el que ya existe) y
-   agrega tu `ANTHROPIC_API_KEY`. El modelo (`claude-haiku-4-5`) necesita soporte de visión para
+1. **Clave de OpenAI**: copia `.env.local.example` a `.env.local` (o edita el que ya existe) y
+   agrega tu `OPENAI_API_KEY`. El modelo (`gpt-5.6-terra`) necesita soporte de visión para
    leer las facturas adjuntas.
 2. `TRIGGER_SECRET_KEY` (dev) ya viene configurada en `.env.local` (proyecto `chat-bot-606-607`
    en Trigger.dev, org Samkill).
@@ -45,7 +45,7 @@ Dos sistemas se despliegan por separado:
   - `BLOB_READ_WRITE_TOKEN` — se agrega solo al crear el Blob store desde la pestaña Storage.
 - **Trigger.dev** (el agente de chat, corre en la infraestructura de Trigger.dev, no en Vercel):
   hay que configurar, en el dashboard del proyecto → Environment Variables → **Prod**:
-  - `ANTHROPIC_API_KEY`
+  - `OPENAI_API_KEY`
   - `BLOB_READ_WRITE_TOKEN` (el mismo valor que en Vercel)
 
   y luego desplegar con `npx trigger.dev@latest deploy` (o pedírmelo).

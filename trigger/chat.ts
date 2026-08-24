@@ -1,6 +1,6 @@
 import { chat } from "@trigger.dev/sdk/ai";
 import { streamText, stepCountIs, tool, type ModelMessage, type UserModelMessage, type TextPart } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 
 import { invoice606Schema } from "@/lib/dgii/schema606";
@@ -8,7 +8,7 @@ import { invoice607Schema } from "@/lib/dgii/schema607";
 import { invoiceIR17Schema } from "@/lib/dgii/schemaIR17";
 import { generateReport } from "@/lib/dgii/generateReport";
 
-const MODEL = "claude-sonnet-5-20251001";
+const MODEL = "gpt-5.6-terra";
 
 type FileMeta = { url: string; contentType: string; name: string };
 
@@ -36,7 +36,7 @@ function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
         }
         return part;
       });
-      return { ...msg, content: cleaned };
+      return { ...msg, content: cleaned } as ModelMessage;
     }
 
     if (msg.role !== "user") return msg;
@@ -189,7 +189,7 @@ export const invoiceChat = chat.agent({
   run: async ({ messages, tools: runTools, signal }) => {
     return streamText({
       ...chat.toStreamTextOptions({ tools: runTools }),
-      model: anthropic(MODEL),
+      model: openai(MODEL),
       system: SYSTEM_PROMPT_BASE,
       messages: preprocessMessages(messages),
       abortSignal: signal,
