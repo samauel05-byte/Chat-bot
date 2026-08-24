@@ -16,7 +16,7 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 const MAX_FILES = 25;
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const ACCEPTED_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -73,7 +73,7 @@ export function Chat() {
     }
     const oversized = candidates.find((file) => file.size > MAX_FILE_SIZE);
     if (oversized) {
-      setSubmitError(`“${oversized.name}” supera el máximo de 20 MB.`);
+      setSubmitError(`“${oversized.name}” supera el máximo de 100 MB.`);
       return existing ?? new DataTransfer().files;
     }
     if (candidates.length > MAX_FILES) {
