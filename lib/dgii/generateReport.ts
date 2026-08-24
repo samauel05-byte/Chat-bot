@@ -132,6 +132,14 @@ export async function generateReport(
     return String(v);
   }
 
+  function excelCellValue(row: Record<string, unknown>, key: string, header: string): string {
+    const rawValue = row[key];
+    // Los montos no aplicables se muestran vacíos en el Excel; el TXT conserva
+    // el 0 requerido por DGII cuando corresponda.
+    if (typeof rawValue === "number" && rawValue === 0) return "";
+    return cellValue(row, header);
+  }
+
   const workbook = new ExcelJS.Workbook();
   workbook.calcProperties.fullCalcOnLoad = true;
   const sheet = workbook.addWorksheet(`Formato ${tipo}`);
@@ -153,7 +161,7 @@ export async function generateReport(
       columns.map((c) => {
         if (c.key === "lineas") return String(idx + 1);
         if (c.key === "estatus") return "";
-        const value = cellValue(row, c.header);
+        const value = excelCellValue(row, c.key as string, c.header);
         if (tipo === "606") {
           if (c.key === "tipoBienesServicios") return displayValue(value, TIPO_BIENES_SERVICIOS_606);
           if (c.key === "tipoIdentificacion") return displayValue(value, TIPO_IDENTIFICACION);
@@ -165,7 +173,7 @@ export async function generateReport(
     );
     if (totalAmountColumn > 0) {
       dataRow.getCell(sumColumn).value = {
-        formula: dataRow.getCell(totalAmountColumn).address,
+        formula: `IF(${dataRow.getCell(totalAmountColumn).address}=0,"",${dataRow.getCell(totalAmountColumn).address})`,
       };
       dataRow.getCell(sumColumn).numFmt = "#,##0.00";
     }
@@ -177,7 +185,7 @@ export async function generateReport(
     const totalRow = sheet.addRow(columns.map(() => ""));
     totalRow.getCell(Math.max(1, sumColumn - 1)).value = "TOTAL FACTURAS";
     totalRow.getCell(sumColumn).value = {
-      formula: `SUM(${columnLetter(sumColumn)}2:${columnLetter(sumColumn)}${totalRow.number - 1})`,
+      formula: `IF(SUM(${columnLetter(sumColumn)}2:${columnLetter(sumColumn)}${totalRow.number - 1})=0,"",SUM(${columnLetter(sumColumn)}2:${columnLetter(sumColumn)}${totalRow.number - 1}))`,
     };
     totalRow.getCell(sumColumn).numFmt = "#,##0.00";
     totalRow.font = { bold: true };
@@ -189,7 +197,7 @@ export async function generateReport(
   if (tipo === "606") {
     const dropdowns: Array<[string, ExcelList]> = [
       ["tipoBienesServicios", TIPO_BIENES_SERVICIOS_606],
-      ["tipoIdentificacion", TIPO_IDENTIFICACION],
+      ["tipoId", TIPO_IDENTIFICACION],
       ["tipoRetencionIsr", TIPO_RETENCION_ISR_606],
       ["formaPago", FORMA_PAGO_606],
     ];
