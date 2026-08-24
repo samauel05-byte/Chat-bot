@@ -1,5 +1,6 @@
 import { put } from "@vercel/blob";
 import ExcelJS from "exceljs";
+import { randomUUID } from "node:crypto";
 import { COLUMNS_606 } from "./schema606";
 import { COLUMNS_607 } from "./schema607";
 import { COLUMNS_IR17 } from "./schemaIR17";
@@ -99,8 +100,12 @@ export async function generateReport(
   );
   const txtContent = txtLines.join("\r\n") + (txtLines.length ? "\r\n" : "");
 
-  const xlsxPathname = `${EXPORTS_PREFIX}${tipo}_${periodo}.xlsx`;
-  const txtPathname = `${EXPORTS_PREFIX}${tipo}_${periodo}.txt`;
+  // A unique suffix prevents simultaneous users from overwriting each other's
+  // exports for the same form and period.
+  const reportId = randomUUID().replaceAll("-", "").slice(0, 12);
+  const basename = `${tipo}_${periodo}_${reportId}`;
+  const xlsxPathname = `${EXPORTS_PREFIX}${basename}.xlsx`;
+  const txtPathname = `${EXPORTS_PREFIX}${basename}.txt`;
 
   await put(xlsxPathname, xlsxBuffer, {
     access: "private",
