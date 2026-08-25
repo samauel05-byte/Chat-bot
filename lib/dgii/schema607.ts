@@ -18,43 +18,40 @@ export const TIPO_INGRESO_607 = {
 const tipoIngresoCodes = Object.keys(TIPO_INGRESO_607) as [string, ...string[]];
 
 export const invoice607Schema = z.object({
-  cliente: z.string().optional().describe("Nombre del cliente/receptor de la factura"),
+  cliente: z.string().describe("Nombre del cliente/receptor o vacío si no aparece"),
   rncCedulaPasaporte: z
     .string()
-    .regex(/^\d{9}$|^\d{11}$/, "RNC (9 dígitos) o Cédula (11 dígitos) del cliente")
-    .optional(),
-  tipoId: z.enum(["1", "2"]).describe("1 = RNC, 2 = Cédula").optional(),
+    .regex(/^\d{9}$|^\d{11}$|^$/, "RNC, Cédula o vacío"),
+  tipoId: z.enum(["1", "2", ""]).describe("1 = RNC, 2 = Cédula, vacío si no aparece"),
   ncf: z.string().min(8).max(19),
-  ncfModificado: z.string().max(19).optional(),
+  ncfModificado: z.string().max(19).describe("NCF modificado o vacío si no aplica"),
   tipoIngreso: z.enum(tipoIngresoCodes),
   fechaComprobante: z.string().regex(/^\d{6}$/, "YYYYMM — solo año y mes, ej: 202604"),
   diaComprobante: z.string().regex(/^\d{2}$/, "DD — solo el día, ej: 14"),
   fechaRetencion: z
     .string()
-    .regex(/^\d{6}$/, "YYYYMM")
-    .optional()
+    .regex(/^\d{6}$|^$/, "YYYYMM o vacío")
     .describe("Solo se completa si existe retención de ITBIS o ISR por terceros."),
   diaRetencion: z
     .string()
-    .regex(/^\d{2}$/, "DD")
-    .optional()
+    .regex(/^\d{2}$|^$/, "DD o vacío")
     .describe("Solo se completa si existe retención de ITBIS o ISR por terceros."),
   montoFacturado: z.number().nonnegative(),
-  itbisFacturado: z.number().nonnegative().default(0),
-  itbisRetenidoTerceros: z.number().nonnegative().default(0),
-  itbisPercibido: z.number().nonnegative().default(0),
-  retencionRentaTerceros: z.number().nonnegative().default(0),
-  isrPercibido: z.number().nonnegative().default(0),
-  isc: z.number().nonnegative().default(0),
-  otrosImpuestos: z.number().nonnegative().default(0),
-  montoPropinaLegal: z.number().nonnegative().default(0),
-  efectivo: z.number().nonnegative().default(0),
-  chequeTransferenciaDeposito: z.number().nonnegative().default(0),
-  tarjetaDebitoCredito: z.number().nonnegative().default(0),
-  ventaCredito: z.number().nonnegative().default(0),
-  bonosCertificadosRegalo: z.number().nonnegative().default(0),
-  permuta: z.number().nonnegative().default(0),
-  otrasFormasVentas: z.number().nonnegative().default(0),
+  itbisFacturado: z.number().nonnegative(),
+  itbisRetenidoTerceros: z.number().nonnegative(),
+  itbisPercibido: z.number().nonnegative(),
+  retencionRentaTerceros: z.number().nonnegative(),
+  isrPercibido: z.number().nonnegative(),
+  isc: z.number().nonnegative(),
+  otrosImpuestos: z.number().nonnegative(),
+  montoPropinaLegal: z.number().nonnegative(),
+  efectivo: z.number().nonnegative(),
+  chequeTransferenciaDeposito: z.number().nonnegative(),
+  tarjetaDebitoCredito: z.number().nonnegative(),
+  ventaCredito: z.number().nonnegative(),
+  bonosCertificadosRegalo: z.number().nonnegative(),
+  permuta: z.number().nonnegative(),
+  otrasFormasVentas: z.number().nonnegative(),
 });
 
 export type Invoice607 = z.infer<typeof invoice607Schema>;

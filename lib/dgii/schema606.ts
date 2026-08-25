@@ -25,41 +25,39 @@ const tipoRetencionIsrCodes = Object.keys(TIPO_RETENCION_ISR_606) as [string, ..
 const formaPagoCodes = Object.keys(FORMA_PAGO_606) as [string, ...string[]];
 
 export const invoice606Schema = z.object({
-  proveedor: z.string().optional().describe("Nombre del proveedor/emisor de la factura"),
+  proveedor: z.string().describe("Nombre del proveedor/emisor de la factura; vacío si no aparece"),
   rncCedula: z
     .string()
     .regex(/^\d{9}$|^\d{11}$/, "RNC (9 dígitos) o Cédula (11 dígitos) del proveedor"),
   tipoId: z.enum(["1", "2"]).describe("1 = RNC, 2 = Cédula"),
   tipoBienesServicios: z.enum(tipoBienesServiciosCodes),
   ncf: z.string().min(8).max(19),
-  ncfModificado: z.string().max(19).optional(),
+  ncfModificado: z.string().max(19).describe("NCF modificado o vacío si no aplica"),
   fechaComprobante: z.string().regex(/^\d{6}$/, "YYYYMM — solo año y mes, ej: 202604"),
   diaComprobante: z.string().regex(/^\d{2}$/, "DD — solo el día, ej: 14"),
   fechaPago: z
     .string()
-    .regex(/^\d{6}$/, "YYYYMM")
-    .optional()
+    .regex(/^\d{6}$|^$/, "YYYYMM o vacío")
     .describe("Fecha de pago/retención. Solo se completa si la factura tiene retención de ITBIS o ISR."),
   diaPago: z
     .string()
-    .regex(/^\d{2}$/, "DD")
-    .optional()
+    .regex(/^\d{2}$|^$/, "DD o vacío")
     .describe("Día de pago/retención. Solo se completa si la factura tiene retención de ITBIS o ISR."),
-  montoFacturadoServicios: z.number().nonnegative().default(0),
-  montoFacturadoBienes: z.number().nonnegative().default(0),
+  montoFacturadoServicios: z.number().nonnegative(),
+  montoFacturadoBienes: z.number().nonnegative(),
   totalMontoFacturado: z.number().nonnegative(),
-  itbisFacturado: z.number().nonnegative().default(0),
-  itbisRetenido: z.number().nonnegative().default(0),
-  itbisProporcionalidad: z.number().nonnegative().default(0),
-  itbisLlevadoCosto: z.number().nonnegative().default(0),
-  itbisPorAdelantar: z.number().nonnegative().default(0),
-  itbisPercibidoCompras: z.number().nonnegative().default(0),
-  tipoRetencionIsr: z.enum(tipoRetencionIsrCodes).default("00"),
-  montoRetencionRenta: z.number().nonnegative().default(0),
-  isrPercibidoCompras: z.number().nonnegative().default(0),
-  isc: z.number().nonnegative().default(0),
-  otrosImpuestos: z.number().nonnegative().default(0),
-  montoPropinaLegal: z.number().nonnegative().default(0),
+  itbisFacturado: z.number().nonnegative(),
+  itbisRetenido: z.number().nonnegative(),
+  itbisProporcionalidad: z.number().nonnegative(),
+  itbisLlevadoCosto: z.number().nonnegative(),
+  itbisPorAdelantar: z.number().nonnegative(),
+  itbisPercibidoCompras: z.number().nonnegative(),
+  tipoRetencionIsr: z.enum(tipoRetencionIsrCodes),
+  montoRetencionRenta: z.number().nonnegative(),
+  isrPercibidoCompras: z.number().nonnegative(),
+  isc: z.number().nonnegative(),
+  otrosImpuestos: z.number().nonnegative(),
+  montoPropinaLegal: z.number().nonnegative(),
   formaPago: z.enum(formaPagoCodes),
 });
 

@@ -1,12 +1,12 @@
 import { z } from "zod";
 
 export const invoiceIR17Schema = z.object({
-  nombre: z.string().optional().describe("Nombre o razón social del contratista/proveedor"),
+  nombre: z.string().describe("Nombre o razón social del contratista/proveedor; vacío si no aparece"),
   rncCedula: z
     .string()
     .regex(/^\d{9}$|^\d{11}$/, "RNC (9 dígitos) o Cédula (11 dígitos) del contratista"),
   tipoId: z.enum(["1", "2"]).describe("1 = RNC (empresa), 2 = Cédula (persona física)"),
-  ncf: z.string().optional().describe("NCF del comprobante fiscal (si aplica)"),
+  ncf: z.string().describe("NCF del comprobante fiscal o vacío si no aplica"),
   periodo: z
     .string()
     .regex(/^\d{6}$/, "YYYYMM — año y mes del período, ej: 202607"),
