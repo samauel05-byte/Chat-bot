@@ -53,6 +53,19 @@ function requestedType(instruction: string): "606" | "607" | "IR17" {
   return "606";
 }
 
+async function loadAttachmentBytes(file: FileMeta): Promise<Uint8Array> {
+  const response = await fetch(file.url);
+  if (!response.ok) {
+    throw new Error(`No se pudo descargar el archivo adjunto (HTTP ${response.status}).`);
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength === 0) {
+    throw new Error("El archivo adjunto está vacío.");
+  }
+  return bytes;
+}
+
 function expectedCount(instruction: string): number | undefined {
   const match = instruction.match(/(?:esper(?:o|adas?)|contiene|son|total(?: de)?)\s+(\d+)\s+(?:facturas?|retenciones?)/i)
     ?? instruction.match(/(\d+)\s+(?:facturas?|retenciones?)/i);
@@ -269,9 +282,18 @@ async function extractFilePart(
       ? invoice607Schema
       : invoiceIR17Schema;
   const noun = tipo === "IR17" ? "retenciones" : "facturas";
+  let fileBytes: Uint8Array;
+  try {
+    // El worker descarga el adjunto y envía sus bytes al modelo. Así evitamos
+    // que la lectura dependa de que OpenAI pueda acceder a una URL privada.
+    fileBytes = await loadAttachmentBytes(file);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`No se pudo preparar la parte ${partNumber} de ${totalParts}: ${reason}`);
+  }
   const attachment: UserModelMessage["content"][number] = file.contentType.startsWith("image/")
-    ? { type: "image", image: new URL(file.url) }
-    : { type: "file", data: new URL(file.url), mediaType: file.contentType as `application/${string}` };
+    ? { type: "image", image: fileBytes }
+    : { type: "file", data: fileBytes, mediaType: file.contentType as `application/${string}` };
 
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
