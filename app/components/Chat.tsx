@@ -343,6 +343,59 @@ export function Chat() {
                     </div>
                   );
                 }
+                if (part.type === "data-batch-progress") {
+                  const progress = part.data as {
+                    status?: string;
+                    current?: number;
+                    total?: number;
+                    fileName?: string;
+                    recordsDetected?: number;
+                    message?: string;
+                  };
+                  const labels: Record<string, string> = {
+                    preparando: "Preparando documentos",
+                    procesando: "Leyendo facturas",
+                    validando: "Validando registros",
+                    generando: "Creando Excel y TXT",
+                    completado: "Reporte listo",
+                    error: "Proceso detenido",
+                  };
+                  const percentage = progress.total
+                    ? Math.round(((progress.current ?? 0) / progress.total) * 100)
+                    : 0;
+                  return (
+                    <div key={i} className="mt-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-900 dark:border-violet-500/30 dark:bg-violet-950/30 dark:text-violet-100">
+                      <div className="flex items-center justify-between gap-3 font-medium">
+                        <span>⏳ {labels[progress.status ?? ""] ?? "Procesando"}</span>
+                        {progress.total ? <span>{progress.current ?? 0}/{progress.total}</span> : null}
+                      </div>
+                      {progress.total ? (
+                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-violet-200 dark:bg-violet-900">
+                          <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${percentage}%` }} />
+                        </div>
+                      ) : null}
+                      {progress.fileName ? <p className="mt-1 truncate">{progress.fileName}</p> : null}
+                      {progress.recordsDetected !== undefined ? <p className="mt-1">Detectadas: {progress.recordsDetected}</p> : null}
+                      {progress.message ? <p className="mt-1 text-red-700 dark:text-red-300">{progress.message}</p> : null}
+                    </div>
+                  );
+                }
+                if (part.type === "data-batch-summary") {
+                  const summary = part.data as {
+                    tipo?: string;
+                    periodo?: string;
+                    recordsDetected?: number;
+                    expectedRecords?: number | null;
+                  };
+                  return (
+                    <div key={i} className="mt-2 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
+                      ✓ Detecté <strong>{summary.recordsDetected ?? 0}</strong> registros para el {summary.tipo} del período {summary.periodo}.
+                      {summary.expectedRecords !== null && summary.expectedRecords !== undefined
+                        ? ` Cantidad esperada: ${summary.expectedRecords}.`
+                        : ""}
+                    </div>
+                  );
+                }
                 if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
                   const done =
                     "state" in part && (part as { state?: string }).state === "output-available";

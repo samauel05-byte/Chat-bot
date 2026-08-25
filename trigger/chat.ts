@@ -1,4 +1,5 @@
 import { chat } from "@trigger.dev/sdk/ai";
+import { metadata } from "@trigger.dev/sdk";
 import { generateText, Output, streamText, stepCountIs, tool, type ModelMessage, type UserModelMessage, type TextPart } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
@@ -15,6 +16,15 @@ type FileMeta = { url: string; contentType: string; name: string };
 type BatchRequest = {
   files: FileMeta[];
   instruction: string;
+};
+
+type BatchProgress = {
+  status: "preparando" | "procesando" | "validando" | "generando" | "completado" | "error";
+  current: number;
+  total: number;
+  fileName?: string;
+  recordsDetected?: number;
+  message?: string;
 };
 
 const BATCH_TOOL_NAMES = ["generateReport606", "generateReport607", "generateReportIR17"];
@@ -62,6 +72,14 @@ function safeProcessingError(error: unknown): string {
     .replace(/(?:sk|tr)_[A-Za-z0-9_-]+/g, "[credencial ocultada]")
     .replace(/\s+/g, " ")
     .slice(0, 300);
+}
+
+function publishBatchProgress(progress: BatchProgress) {
+  const event = { ...progress, updatedAt: new Date().toISOString() };
+  // Queda guardado con el run de Trigger para revisar cualquier lote fallido.
+  metadata.set("invoiceBatch", event);
+  // El mismo estado se transmite al chat para que la persona vea el avance.
+  chat.response.write({ type: "data-batch-progress", id: "batch-progress", data: event });
 }
 
 async function loadAttachmentBytes(file: FileMeta): Promise<Uint8Array> {
@@ -365,6 +383,13 @@ async function extractLargeBatch(
   // terminar aunque la persona cierre la pestaña o pierda conexión.
   const rows: Record<string, unknown>[] = [];
   for (const [index, file] of batch.files.entries()) {
+    publishBatchProgress({
+      status: "procesando",
+      current: index + 1,
+      total: batch.files.length,
+      fileName: file.name,
+      recordsDetected: rows.length,
+    });
     const extracted = await extractFilePart(
       file,
       batch.instruction,
@@ -416,42 +441,75 @@ export const invoiceChat = chat.agent({
     const batch = getCurrentBatch(messages);
     if (batch) {
       const tipo = requestedType(batch.instruction);
-      const rows = await extractLargeBatch(batch, tipo);
-      const expected = expectedCount(batch.instruction);
+      try {
+        publishBatchProgress({ status: "preparando", current: 0, total: batch.files.length });
+        const rows = await extractLargeBatch(batch, tipo);
+        const expected = expectedCount(batch.instruction);
 
-      if (expected !== undefined && rows.length !== expected) {
-        throw new Error(
-          `Control de completitud: se esperaban ${expected} registros y se extrajeron ${rows.length} ` +
-          `después de revisar las ${batch.files.length} partes. No se generó un reporte parcial.`
-        );
+        publishBatchProgress({
+          status: "validando",
+          current: batch.files.length,
+          total: batch.files.length,
+          recordsDetected: rows.length,
+        });
+        if (expected !== undefined && rows.length !== expected) {
+          throw new Error(
+            `Control de completitud: se esperaban ${expected} registros y se extrajeron ${rows.length} ` +
+            `después de revisar las ${batch.files.length} partes. No se generó un reporte parcial.`
+          );
+        }
+        if (rows.length === 0) {
+          throw new Error("No se encontraron facturas o retenciones legibles en los archivos adjuntos.");
+        }
+
+        const periodo = reportPeriod(batch.instruction, rows);
+        chat.response.write({
+          type: "data-batch-summary",
+          data: { tipo, periodo, recordsDetected: rows.length, expectedRecords: expected ?? null },
+        });
+        publishBatchProgress({
+          status: "generando",
+          current: batch.files.length,
+          total: batch.files.length,
+          recordsDetected: rows.length,
+        });
+        const report = await generateReport(tipo, periodo, rows);
+        const xlsxUrl = `/api/exports/${report.xlsxPathname.split("/").at(-1)}`;
+        const txtUrl = `/api/exports/${report.txtPathname.split("/").at(-1)}`;
+
+        publishBatchProgress({
+          status: "completado",
+          current: batch.files.length,
+          total: batch.files.length,
+          recordsDetected: rows.length,
+        });
+        // Los enlaces ya existen: no dependas de otra llamada a la IA solo para
+        // redactar el mensaje, porque podía fallar después de crear los archivos.
+        const { waitUntilComplete } = chat.stream.writer({
+          execute: ({ write }) => {
+            const id = "reporte-listo";
+            write({ type: "text-start", id });
+            write({
+              type: "text-delta",
+              id,
+              delta:
+                `Reporte ${tipo} del período ${periodo} generado con ${rows.length} registros.\n\n` +
+                `[📥 Descargar Excel](${xlsxUrl}) | [📄 Descargar TXT](${txtUrl})`,
+            });
+            write({ type: "text-end", id });
+          },
+        });
+        await waitUntilComplete();
+        return;
+      } catch (error) {
+        publishBatchProgress({
+          status: "error",
+          current: 0,
+          total: batch.files.length,
+          message: safeProcessingError(error),
+        });
+        throw error;
       }
-      if (rows.length === 0) {
-        throw new Error("No se encontraron facturas o retenciones legibles en los archivos adjuntos.");
-      }
-
-      const periodo = reportPeriod(batch.instruction, rows);
-      const report = await generateReport(tipo, periodo, rows);
-      const xlsxUrl = `/api/exports/${report.xlsxPathname.split("/").at(-1)}`;
-      const txtUrl = `/api/exports/${report.txtPathname.split("/").at(-1)}`;
-
-      // Los enlaces ya existen: no dependas de otra llamada a la IA solo para
-      // redactar el mensaje, porque podía fallar después de crear los archivos.
-      const { waitUntilComplete } = chat.stream.writer({
-        execute: ({ write }) => {
-          const id = "reporte-listo";
-          write({ type: "text-start", id });
-          write({
-            type: "text-delta",
-            id,
-            delta:
-              `Reporte ${tipo} del período ${periodo} generado con ${rows.length} registros.\n\n` +
-              `[📥 Descargar Excel](${xlsxUrl}) | [📄 Descargar TXT](${txtUrl})`,
-          });
-          write({ type: "text-end", id });
-        },
-      });
-      await waitUntilComplete();
-      return;
     }
 
     return streamText({
