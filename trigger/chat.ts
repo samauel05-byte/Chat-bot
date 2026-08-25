@@ -274,28 +274,55 @@ async function extractFilePart(
     ? { type: "image", image: new URL(file.url) }
     : { type: "file", data: new URL(file.url), mediaType: file.contentType as `application/${string}` };
 
-  const result = await generateText({
-    model: openai(MODEL),
-    system: BATCH_EXTRACTION_PROMPT,
-    output: Output.object({
-      schema: z.object({
-        registros: z.array(schema).describe(`Todos los registros ${tipo} encontrados en esta parte`),
-      }),
-    }),
-    messages: [{
-      role: "user",
-      content: [
-        {
-          type: "text",
-          text: `Tipo de reporte: ${tipo}. Parte ${partNumber} de ${totalParts}: ${file.name}.\nInstrucción original: ${instruction}\nExtrae todos los ${noun} visibles en esta parte.`,
-        },
-        attachment,
-      ],
-    }],
-    abortSignal: signal,
-  });
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const result = await generateText({
+        model: openai(MODEL),
+        system: BATCH_EXTRACTION_PROMPT + (attempt === 2
+          ? "\nReintento: revisa estrictamente que cada registro cumpla el formato solicitado antes de responder."
+          : ""),
+        output: Output.object({
+          schema: z.object({
+            registros: z.array(schema).describe(`Todos los registros ${tipo} encontrados en esta parte`),
+          }),
+        }),
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Tipo de reporte: ${tipo}. Parte ${partNumber} de ${totalParts}: ${file.name}.\nInstrucción original: ${instruction}\nExtrae todos los ${noun} visibles en esta parte.`,
+            },
+            attachment,
+          ],
+        }],
+        abortSignal: signal,
+      });
 
-  return result.output.registros as Record<string, unknown>[];
+      return result.output.registros as Record<string, unknown>[];
+    } catch (error) {
+      lastError = error;
+      console.error("[invoice-chat] extraction attempt failed", {
+        partNumber,
+        totalParts,
+        fileName: file.name,
+        attempt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  console.error("[invoice-chat] extraction failed after retry", {
+    partNumber,
+    totalParts,
+    fileName: file.name,
+    error: lastError instanceof Error ? lastError.message : String(lastError),
+  });
+  throw new Error(
+    `No se pudo leer la parte ${partNumber} de ${totalParts} ("${file.name}") después de dos intentos. ` +
+    "No se generó ningún archivo parcial."
+  );
 }
 
 async function extractLargeBatch(
@@ -360,8 +387,14 @@ export const invoiceChat = chat.agent({
   uiMessageStreamOptions: {
     onError: (error) => {
       console.error("invoice-chat stream error:", error);
-      if (error instanceof Error && error.message.startsWith("Control de completitud:")) {
-        return `No se generó ningún archivo: ${error.message}`;
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        message.startsWith("Control de completitud:") ||
+        message.startsWith("No se pudo leer la parte") ||
+        message.startsWith("No se encontraron facturas") ||
+        message.startsWith("No se pudo determinar el período")
+      ) {
+        return `No se generó ningún archivo: ${message}`;
       }
       return "Hubo un problema generando la respuesta. Intenta de nuevo.";
     },
