@@ -261,8 +261,7 @@ async function extractFilePart(
   instruction: string,
   tipo: "606" | "607" | "IR17",
   partNumber: number,
-  totalParts: number,
-  signal?: AbortSignal
+  totalParts: number
 ): Promise<Record<string, unknown>[]> {
   const schema = tipo === "606"
     ? invoice606Schema
@@ -275,7 +274,7 @@ async function extractFilePart(
     : { type: "file", data: new URL(file.url), mediaType: file.contentType as `application/${string}` };
 
   let lastError: unknown;
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const result = await generateText({
         model: openai(MODEL),
@@ -297,7 +296,6 @@ async function extractFilePart(
             attachment,
           ],
         }],
-        abortSignal: signal,
       });
 
       return result.output.registros as Record<string, unknown>[];
@@ -320,50 +318,30 @@ async function extractFilePart(
     error: lastError instanceof Error ? lastError.message : String(lastError),
   });
   throw new Error(
-    `No se pudo leer la parte ${partNumber} de ${totalParts} ("${file.name}") después de dos intentos. ` +
+    `No se pudo leer la parte ${partNumber} de ${totalParts} ("${file.name}") después de tres intentos. ` +
     "No se generó ningún archivo parcial."
   );
 }
 
 async function extractLargeBatch(
   batch: BatchRequest,
-  tipo: "606" | "607" | "IR17",
-  signal?: AbortSignal
+  tipo: "606" | "607" | "IR17"
 ): Promise<Record<string, unknown>[]> {
-  // Procesar una parte a la vez evita límites de la API y conserva el orden.
-  // Para reportes fiscales, precisión es más importante que velocidad.
-  const results: Record<string, unknown>[][] = new Array(batch.files.length);
-  let nextIndex = 0;
-  const workerCount = 1;
-
-  await Promise.all(Array.from({ length: workerCount }, async () => {
-    while (nextIndex < batch.files.length) {
-      const index = nextIndex++;
-      results[index] = await extractFilePart(
-        batch.files[index],
-        batch.instruction,
-        tipo,
-        index + 1,
-        batch.files.length,
-        signal
-      );
-    }
-  }));
-
-  return results.flat();
-}
-
-function removeDuplicateNcfRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
-  const seenNcfs = new Set<string>();
-  return rows.filter((row) => {
-    const ncf = String(row.ncf ?? "").trim().toUpperCase();
-    // Un NCF identifica un comprobante. Si la misma factura aparece al final
-    // de una parte y al inicio de otra, conservarla dos veces dañaría el 606/607.
-    if (!ncf) return true;
-    if (seenNcfs.has(ncf)) return false;
-    seenNcfs.add(ncf);
-    return true;
-  });
+  // Ejecutar en orden conserva la trazabilidad de cada archivo y evita los
+  // límites de la API. No se usa la señal del navegador: un lote fiscal debe
+  // terminar aunque la persona cierre la pestaña o pierda conexión.
+  const rows: Record<string, unknown>[] = [];
+  for (const [index, file] of batch.files.entries()) {
+    const extracted = await extractFilePart(
+      file,
+      batch.instruction,
+      tipo,
+      index + 1,
+      batch.files.length
+    );
+    rows.push(...extracted);
+  }
+  return rows;
 }
 
 function reportPeriod(instruction: string, rows: Record<string, unknown>[]): string {
@@ -390,10 +368,11 @@ export const invoiceChat = chat.agent({
       console.error("invoice-chat stream error:", error);
       const message = error instanceof Error ? error.message : String(error);
       if (
-        message.startsWith("Control de completitud:") ||
-        message.startsWith("No se pudo leer la parte") ||
-        message.startsWith("No se encontraron facturas") ||
-        message.startsWith("No se pudo determinar el período")
+        message.includes("Control de completitud:") ||
+        message.includes("No se pudo leer la parte") ||
+        message.includes("No se encontraron facturas") ||
+        message.includes("No se pudo determinar el período") ||
+        message.includes("El período debe tener formato")
       ) {
         return `No se generó ningún archivo: ${message}`;
       }
@@ -404,8 +383,7 @@ export const invoiceChat = chat.agent({
     const batch = getCurrentBatch(messages);
     if (batch) {
       const tipo = requestedType(batch.instruction);
-      const extractedRows = await extractLargeBatch(batch, tipo, signal);
-      const rows = removeDuplicateNcfRows(extractedRows);
+      const rows = await extractLargeBatch(batch, tipo);
       const expected = expectedCount(batch.instruction);
 
       if (expected !== undefined && rows.length !== expected) {
@@ -423,17 +401,6 @@ export const invoiceChat = chat.agent({
       const xlsxUrl = `/api/exports/${report.xlsxPathname.split("/").at(-1)}`;
       const txtUrl = `/api/exports/${report.txtPathname.split("/").at(-1)}`;
 
-      /*
-        ...chat.toStreamTextOptions({ tools: runTools }),
-        model: openai(MODEL),
-        system: "Responde siempre en español. Repite fielmente los datos y enlaces suministrados; no llames herramientas.",
-        prompt:
-          `El reporte ${tipo} del período ${periodo} se generó correctamente con ${rows.length} registros. ` +
-          `Informa el resultado de forma breve y entrega exactamente estos enlaces: ` +
-          `[\ud83d\udce5 Descargar Excel](${xlsxUrl}) | [\ud83d\udcc4 Descargar TXT](${txtUrl}).`,
-        abortSignal: signal,
-      });
-      */
       // Los enlaces ya existen: no dependas de otra llamada a la IA solo para
       // redactar el mensaje, porque podía fallar después de crear los archivos.
       const { waitUntilComplete } = chat.stream.writer({
