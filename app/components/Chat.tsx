@@ -38,6 +38,14 @@ function toolLabel(toolType: string) {
   return TOOL_LABELS[name] ?? `⚙ ${name}`;
 }
 
+function getChatErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message.trim() : String(error ?? "").trim();
+  if (!message || /^error$/i.test(message) || /^an error occurred\.?$/i.test(message)) {
+    return "El chat no pudo iniciar el procesamiento. Revisa tu conexión e inténtalo nuevamente.";
+  }
+  return message;
+}
+
 async function uploadInBatches<T>(items: T[], uploadOne: (item: T, index: number) => Promise<void>) {
   let nextIndex = 0;
   const workerCount = Math.min(UPLOAD_CONCURRENCY, items.length);
@@ -112,10 +120,15 @@ export function Chat() {
   const isStreaming = status === "streaming" || status === "submitted";
   const lastMessage = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMessage?.role !== "assistant";
+  const chatErrorMessage = error ? getChatErrorMessage(error) : null;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, showTypingIndicator]);
+
+  useEffect(() => {
+    if (error) console.error("[nala] chat processing error:", error);
+  }, [error]);
 
   const MODE_PREFIX: Record<"606" | "607" | "IR17", string> = {
     "606": "Esta factura es una COMPRA: regístrala como formato 606. ",
@@ -362,9 +375,9 @@ export function Chat() {
             </MessageBubble>
           )}
 
-          {error && (
+          {chatErrorMessage && (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400">
-              ⚠️ No pudimos completar el procesamiento. Intenta nuevamente.
+              ⚠️ {chatErrorMessage}
             </p>
           )}
           <div ref={messagesEndRef} />
