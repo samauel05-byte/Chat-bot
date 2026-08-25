@@ -1,5 +1,5 @@
 import { chat } from "@trigger.dev/sdk/ai";
-import { streamText, stepCountIs, tool, type ModelMessage, type UserModelMessage, type TextPart } from "ai";
+import { generateText, Output, streamText, stepCountIs, tool, type ModelMessage, type UserModelMessage, type TextPart } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 
@@ -12,7 +12,65 @@ const MODEL = "gpt-5.6-terra";
 
 type FileMeta = { url: string; contentType: string; name: string };
 
+type BatchRequest = {
+  files: FileMeta[];
+  instruction: string;
+};
+
 const BATCH_TOOL_NAMES = ["generateReport606", "generateReport607", "generateReportIR17"];
+
+function getTextContent(message: ModelMessage): string {
+  if (typeof message.content === "string") return message.content;
+  const textPart = message.content.find(
+    (part: TextPart | unknown) => (part as TextPart).type === "text"
+  ) as TextPart | undefined;
+  return textPart?.text ?? "";
+}
+
+function getCurrentBatch(messages: ModelMessage[]): BatchRequest | null {
+  const current = [...messages].reverse().find((message) => message.role === "user");
+  if (!current) return null;
+
+  const rawText = getTextContent(current);
+  const markerMatch = rawText.match(/\[FACTURAS:([\s\S]*?)\]$/m);
+  if (!markerMatch) return null;
+
+  try {
+    const files = JSON.parse(markerMatch[1]) as FileMeta[];
+    if (!Array.isArray(files) || files.length < 2) return null;
+    return {
+      files,
+      instruction: rawText.replace(/\s*\[FACTURAS:[\s\S]*?\]$/, "").trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function requestedType(instruction: string): "606" | "607" | "IR17" {
+  if (/RETENCIÓN|IR-?17/i.test(instruction)) return "IR17";
+  if (/VENTA|607/i.test(instruction)) return "607";
+  return "606";
+}
+
+function expectedCount(instruction: string): number | undefined {
+  const match = instruction.match(/(?:esper(?:o|adas?)|contiene|son|total(?: de)?)\s+(\d+)\s+(?:facturas?|retenciones?)/i)
+    ?? instruction.match(/(\d+)\s+(?:facturas?|retenciones?)/i);
+  return match ? Number(match[1]) : undefined;
+}
+
+const BATCH_EXTRACTION_PROMPT = `Extrae todos los registros del archivo adjunto para un reporte de la DGII de República Dominicana.
+
+Reglas obligatorias:
+- Recorre todas las páginas de principio a fin y devuelve un registro por cada factura o retención. No resumas, no omitas y no reutilices datos de otros archivos.
+- Respeta cualquier filtro indicado por el usuario.
+- RNC de 9 dígitos: tipoId "1". Cédula de 11 dígitos: tipoId "2".
+- fechaComprobante contiene YYYYMM y diaComprobante contiene DD.
+- Si un campo no aparece usa 0 o una cadena vacía, según su tipo. Si es ilegible usa "ILEGIBLE" cuando el esquema permita texto.
+- Para 606, fechaPago/diaPago solo se incluyen si existe retención de ITBIS o ISR.
+- Para 607, fechaRetencion/diaRetencion solo se incluyen si existe retención de ITBIS o ISR por terceros.
+- Una nota de crédito o débito y la factura original son registros separados cuando ambas aparecen. El NCF propio va en ncf y el NCF afectado va en ncfModificado.
+- No inventes registros para alcanzar una cantidad. La validación global se hace después de consolidar todas las partes.`;
 
 function preprocessMessages(messages: ModelMessage[]): ModelMessage[] {
   return messages.map((msg) => {
@@ -198,6 +256,91 @@ INSTRUCCIÓN PRINCIPAL — una sola llamada de tool con todo el lote:
 - NUNCA preguntes al usuario qué falta. NUNCA hagas múltiples llamadas al mismo tool.
 - Responde siempre en español.`;
 
+async function extractFilePart(
+  file: FileMeta,
+  instruction: string,
+  tipo: "606" | "607" | "IR17",
+  partNumber: number,
+  totalParts: number,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>[]> {
+  const schema = tipo === "606"
+    ? invoice606Schema
+    : tipo === "607"
+      ? invoice607Schema
+      : invoiceIR17Schema;
+  const noun = tipo === "IR17" ? "retenciones" : "facturas";
+  const attachment: UserModelMessage["content"][number] = file.contentType.startsWith("image/")
+    ? { type: "image", image: new URL(file.url) }
+    : { type: "file", data: new URL(file.url), mediaType: file.contentType as `application/${string}` };
+
+  const result = await generateText({
+    model: openai(MODEL),
+    system: BATCH_EXTRACTION_PROMPT,
+    output: Output.object({
+      schema: z.object({
+        registros: z.array(schema).describe(`Todos los registros ${tipo} encontrados en esta parte`),
+      }),
+    }),
+    messages: [{
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: `Tipo de reporte: ${tipo}. Parte ${partNumber} de ${totalParts}: ${file.name}.\nInstrucción original: ${instruction}\nExtrae todos los ${noun} visibles en esta parte.`,
+        },
+        attachment,
+      ],
+    }],
+    abortSignal: signal,
+  });
+
+  return result.output.registros as Record<string, unknown>[];
+}
+
+async function extractLargeBatch(
+  batch: BatchRequest,
+  tipo: "606" | "607" | "IR17",
+  signal?: AbortSignal
+): Promise<Record<string, unknown>[]> {
+  // A small worker pool prevents rate-limit bursts while keeping large jobs fast.
+  const results: Record<string, unknown>[][] = new Array(batch.files.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(3, batch.files.length);
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < batch.files.length) {
+      const index = nextIndex++;
+      results[index] = await extractFilePart(
+        batch.files[index],
+        batch.instruction,
+        tipo,
+        index + 1,
+        batch.files.length,
+        signal
+      );
+    }
+  }));
+
+  return results.flat();
+}
+
+function reportPeriod(instruction: string, rows: Record<string, unknown>[]): string {
+  const explicit = instruction.match(/\b(20\d{4})\b/)?.[1];
+  if (explicit) return explicit;
+
+  const frequencies = new Map<string, number>();
+  for (const row of rows) {
+    const value = String(row.fechaComprobante ?? row.periodo ?? "");
+    if (/^20\d{4}$/.test(value)) {
+      frequencies.set(value, (frequencies.get(value) ?? 0) + 1);
+    }
+  }
+  const period = [...frequencies.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (!period) throw new Error("No se pudo determinar el período YYYYMM del lote.");
+  return period;
+}
+
 export const invoiceChat = chat.agent({
   id: "invoice-chat",
   tools,
@@ -208,6 +351,39 @@ export const invoiceChat = chat.agent({
     },
   },
   run: async ({ messages, tools: runTools, signal }) => {
+    const batch = getCurrentBatch(messages);
+    if (batch) {
+      const tipo = requestedType(batch.instruction);
+      const rows = await extractLargeBatch(batch, tipo, signal);
+      const expected = expectedCount(batch.instruction);
+
+      if (expected !== undefined && rows.length !== expected) {
+        throw new Error(
+          `Control de completitud: se esperaban ${expected} registros y se extrajeron ${rows.length} ` +
+          `después de revisar las ${batch.files.length} partes. No se generó un reporte parcial.`
+        );
+      }
+      if (rows.length === 0) {
+        throw new Error("No se encontraron facturas o retenciones legibles en los archivos adjuntos.");
+      }
+
+      const periodo = reportPeriod(batch.instruction, rows);
+      const report = await generateReport(tipo, periodo, rows);
+      const xlsxUrl = `/api/exports/${report.xlsxPathname.split("/").at(-1)}`;
+      const txtUrl = `/api/exports/${report.txtPathname.split("/").at(-1)}`;
+
+      return streamText({
+        ...chat.toStreamTextOptions({ tools: runTools }),
+        model: openai(MODEL),
+        system: "Responde siempre en español. Repite fielmente los datos y enlaces suministrados; no llames herramientas.",
+        prompt:
+          `El reporte ${tipo} del período ${periodo} se generó correctamente con ${rows.length} registros. ` +
+          `Informa el resultado de forma breve y entrega exactamente estos enlaces: ` +
+          `[\ud83d\udce5 Descargar Excel](${xlsxUrl}) | [\ud83d\udcc4 Descargar TXT](${txtUrl}).`,
+        abortSignal: signal,
+      });
+    }
+
     return streamText({
       ...chat.toStreamTextOptions({ tools: runTools }),
       model: openai(MODEL),
