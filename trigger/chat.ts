@@ -330,10 +330,11 @@ async function extractLargeBatch(
   tipo: "606" | "607" | "IR17",
   signal?: AbortSignal
 ): Promise<Record<string, unknown>[]> {
-  // A small worker pool prevents rate-limit bursts while keeping large jobs fast.
+  // Procesar una parte a la vez evita límites de la API y conserva el orden.
+  // Para reportes fiscales, precisión es más importante que velocidad.
   const results: Record<string, unknown>[][] = new Array(batch.files.length);
   let nextIndex = 0;
-  const workerCount = Math.min(3, batch.files.length);
+  const workerCount = 1;
 
   await Promise.all(Array.from({ length: workerCount }, async () => {
     while (nextIndex < batch.files.length) {
@@ -422,7 +423,7 @@ export const invoiceChat = chat.agent({
       const xlsxUrl = `/api/exports/${report.xlsxPathname.split("/").at(-1)}`;
       const txtUrl = `/api/exports/${report.txtPathname.split("/").at(-1)}`;
 
-      return streamText({
+      /*
         ...chat.toStreamTextOptions({ tools: runTools }),
         model: openai(MODEL),
         system: "Responde siempre en español. Repite fielmente los datos y enlaces suministrados; no llames herramientas.",
@@ -432,6 +433,25 @@ export const invoiceChat = chat.agent({
           `[\ud83d\udce5 Descargar Excel](${xlsxUrl}) | [\ud83d\udcc4 Descargar TXT](${txtUrl}).`,
         abortSignal: signal,
       });
+      */
+      // Los enlaces ya existen: no dependas de otra llamada a la IA solo para
+      // redactar el mensaje, porque podía fallar después de crear los archivos.
+      const { waitUntilComplete } = chat.stream.writer({
+        execute: ({ write }) => {
+          const id = "reporte-listo";
+          write({ type: "text-start", id });
+          write({
+            type: "text-delta",
+            id,
+            delta:
+              `Reporte ${tipo} del período ${periodo} generado con ${rows.length} registros.\n\n` +
+              `[📥 Descargar Excel](${xlsxUrl}) | [📄 Descargar TXT](${txtUrl})`,
+          });
+          write({ type: "text-end", id });
+        },
+      });
+      await waitUntilComplete();
+      return;
     }
 
     return streamText({
