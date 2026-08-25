@@ -325,6 +325,19 @@ async function extractLargeBatch(
   return results.flat();
 }
 
+function removeDuplicateNcfRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  const seenNcfs = new Set<string>();
+  return rows.filter((row) => {
+    const ncf = String(row.ncf ?? "").trim().toUpperCase();
+    // Un NCF identifica un comprobante. Si la misma factura aparece al final
+    // de una parte y al inicio de otra, conservarla dos veces dañaría el 606/607.
+    if (!ncf) return true;
+    if (seenNcfs.has(ncf)) return false;
+    seenNcfs.add(ncf);
+    return true;
+  });
+}
+
 function reportPeriod(instruction: string, rows: Record<string, unknown>[]): string {
   const explicit = instruction.match(/\b(20\d{4})\b/)?.[1];
   if (explicit) return explicit;
@@ -347,6 +360,9 @@ export const invoiceChat = chat.agent({
   uiMessageStreamOptions: {
     onError: (error) => {
       console.error("invoice-chat stream error:", error);
+      if (error instanceof Error && error.message.startsWith("Control de completitud:")) {
+        return `No se generó ningún archivo: ${error.message}`;
+      }
       return "Hubo un problema generando la respuesta. Intenta de nuevo.";
     },
   },
@@ -354,7 +370,8 @@ export const invoiceChat = chat.agent({
     const batch = getCurrentBatch(messages);
     if (batch) {
       const tipo = requestedType(batch.instruction);
-      const rows = await extractLargeBatch(batch, tipo, signal);
+      const extractedRows = await extractLargeBatch(batch, tipo, signal);
+      const rows = removeDuplicateNcfRows(extractedRows);
       const expected = expectedCount(batch.instruction);
 
       if (expected !== undefined && rows.length !== expected) {

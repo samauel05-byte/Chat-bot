@@ -19,6 +19,7 @@ const MAX_FILES = 25;
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const PDF_PAGES_PER_PART = 10;
 const LARGE_BATCH_FILE_COUNT = 10;
+const UPLOAD_CONCURRENCY = 3;
 const LARGE_BATCH_INSTRUCTION =
   "Procesa todas las facturas adjuntas, genera el reporte completo y verifica que no falte ninguna antes de crear el Excel y el TXT.";
 const ACCEPTED_TYPES = new Set([
@@ -34,6 +35,19 @@ const ACCEPTED_TYPES = new Set([
 function toolLabel(toolType: string) {
   const name = toolType.replace("tool-", "");
   return TOOL_LABELS[name] ?? `⚙ ${name}`;
+}
+
+async function uploadInBatches<T>(items: T[], uploadOne: (item: T, index: number) => Promise<void>) {
+  let nextIndex = 0;
+  const workerCount = Math.min(UPLOAD_CONCURRENCY, items.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const index = nextIndex++;
+        await uploadOne(items[index], index);
+      }
+    })
+  );
 }
 
 async function splitLongPdf(file: File): Promise<File[]> {
@@ -179,14 +193,20 @@ export function Chat() {
         const preparedFiles = (
           await Promise.all(Array.from(files).map((file) => splitLongPdf(file)))
         ).flat();
+        if (preparedFiles.length > MAX_FILES) {
+          setSubmitError(
+            `El PDF se divide en ${preparedFiles.length} partes. El máximo seguro por lote es ${MAX_FILES}; súbelo en dos lotes.`
+          );
+          return;
+        }
         const isLargeBatch =
           preparedFiles.length > files.length || files.length >= LARGE_BATCH_FILE_COUNT;
         const baseText =
           (mode ? MODE_PREFIX[mode] : "") +
           input +
           (isLargeBatch ? `\n\n${LARGE_BATCH_INSTRUCTION}` : "");
-        const uploaded = await Promise.all(
-          preparedFiles.map(async (file) => {
+        const uploaded: { url: string; contentType: string; name: string }[] = new Array(preparedFiles.length);
+        await uploadInBatches(preparedFiles, async (file, index) => {
             const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
             // Upload directly from browser to Vercel Blob CDN (bypasses 4.5 MB serverless limit)
             const blob = await upload(`uploads/${safeName}`, file, {
@@ -194,9 +214,8 @@ export function Chat() {
               handleUploadUrl: "/api/upload",
             });
             const proxyUrl = `${window.location.origin}/api/invoice/${blob.pathname}`;
-            return { url: proxyUrl, contentType: file.type, name: file.name };
-          })
-        );
+            uploaded[index] = { url: proxyUrl, contentType: file.type, name: file.name };
+          });
         const marker = `\n\n[FACTURAS:${JSON.stringify(uploaded)}]`;
         sendMessage({ text: baseText + marker });
       } catch (err) {
