@@ -9,7 +9,9 @@ export async function POST(req: NextRequest) {
       body,
       request: req,
       onBeforeGenerateToken: async () => ({
-        maximumSizeInBytes: 100 * 1024 * 1024,
+        // La carga va directo del navegador a Vercel Blob. 500 MB cubre
+        // expedientes grandes sin abrir cargas ilimitadas ni costos imprevistos.
+        maximumSizeInBytes: 500 * 1024 * 1024,
         addRandomSuffix: true,
         allowedContentTypes: [
           "image/jpeg",
