@@ -15,9 +15,10 @@ const TOOL_LABELS: Record<string, string> = {
   generateReportIR17: "📊 Generando reporte IR-17 (retenciones)…",
 };
 
-const MAX_FILES = 25;
+const MAX_FILES = 100;
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
-const PDF_PAGES_PER_PART = 10;
+// Las partes pequeñas reducen omisiones en PDFs escaneados de muchas páginas.
+const PDF_PAGES_PER_PART = 4;
 const LARGE_BATCH_FILE_COUNT = 10;
 const UPLOAD_CONCURRENCY = 3;
 const LARGE_BATCH_INSTRUCTION =
