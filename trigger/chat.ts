@@ -53,6 +53,17 @@ function requestedType(instruction: string): "606" | "607" | "IR17" {
   return "606";
 }
 
+function safeProcessingError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  // El mensaje se muestra al usuario para diagnosticar el lote, pero se limita
+  // para no revelar trazas, URLs completas ni datos de autenticación.
+  return message
+    .replace(/https?:\/\/\S+/g, "[URL ocultada]")
+    .replace(/(?:sk|tr)_[A-Za-z0-9_-]+/g, "[credencial ocultada]")
+    .replace(/\s+/g, " ")
+    .slice(0, 300);
+}
+
 async function loadAttachmentBytes(file: FileMeta): Promise<Uint8Array> {
   const response = await fetch(file.url);
   if (!response.ok) {
@@ -341,7 +352,7 @@ async function extractFilePart(
   });
   throw new Error(
     `No se pudo leer la parte ${partNumber} de ${totalParts} ("${file.name}") después de tres intentos. ` +
-    "No se generó ningún archivo parcial."
+    `Motivo: ${safeProcessingError(lastError)}. No se generó ningún archivo parcial.`
   );
 }
 
