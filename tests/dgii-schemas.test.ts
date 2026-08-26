@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import ExcelJS from "exceljs";
 import { z } from "zod";
 
 import { invoice606Schema } from "../lib/dgii/schema606";
 import { invoice607Schema } from "../lib/dgii/schema607";
 import { invoiceIR17Schema } from "../lib/dgii/schemaIR17";
-import { normalizeDgiiCode } from "../lib/dgii/generateReport";
+import { addExcelDropdown, has606Retention, normalizeDgiiCode } from "../lib/dgii/generateReport";
 import { TIPO_BIENES_SERVICIOS_606 } from "../lib/dgii/catalogs";
 
 const schemas = {
@@ -60,4 +61,29 @@ test("Formato 606: fechas de retención aceptan vacío", () => {
 test("Formato 606: los códigos de bienes conservan el cero a la izquierda", () => {
   assert.equal(normalizeDgiiCode("2", TIPO_BIENES_SERVICIOS_606), "02");
   assert.equal(normalizeDgiiCode("02 - GASTOS POR TRABAJOS, SUMINISTROS Y SERVICIOS", TIPO_BIENES_SERVICIOS_606), "02");
+});
+
+test("Formato 606: 00 - NINGUNA queda vacío si no existe retención", () => {
+  assert.equal(
+    has606Retention({ tipoRetencionIsr: "00 - NINGUNA", itbisRetenido: 0, montoRetencionRenta: 0 }),
+    false
+  );
+  assert.equal(
+    has606Retention({ tipoRetencionIsr: "00", itbisRetenido: 18, montoRetencionRenta: 0 }),
+    true
+  );
+});
+
+test("Excel 606: los menús desplegables comienzan en la primera factura", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("DIGITAR");
+  workbook.addWorksheet("Listas DGII");
+  addExcelDropdown(sheet, 5, 1, TIPO_BIENES_SERVICIOS_606, 10, 10);
+
+  const reloaded = new ExcelJS.Workbook();
+  await reloaded.xlsx.load(await workbook.xlsx.writeBuffer());
+  const validation = reloaded.getWorksheet("DIGITAR")?.getCell("E10").dataValidation;
+  assert.equal(validation?.type, "list");
+  assert.deepEqual(validation?.formulae, ["DGII_LISTA_1"]);
+  assert.equal(reloaded.getWorksheet("DIGITAR")?.getCell("E1009").dataValidation.type, "list");
 });

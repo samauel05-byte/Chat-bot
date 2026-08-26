@@ -2,7 +2,7 @@ import { put } from "@vercel/blob";
 import ExcelJS from "exceljs";
 import { randomUUID } from "node:crypto";
 import { COLUMNS_606 } from "./schema606";
-import { COLUMNS_607 } from "./schema607";
+import { COLUMNS_607, TIPO_INGRESO_607 } from "./schema607";
 import { COLUMNS_IR17 } from "./schemaIR17";
 import {
   FORMA_PAGO_606,
@@ -54,6 +54,8 @@ export function normalizeDgiiCode(value: unknown, list: ExcelList): string {
 }
 
 function dgiiListForColumn(tipo: Tipo, key: string): ExcelList | undefined {
+  if (key === "tipoId") return TIPO_IDENTIFICACION;
+  if (tipo === "607" && key === "tipoIngreso") return TIPO_INGRESO_607;
   if (tipo !== "606") return undefined;
   if (key === "tipoBienesServicios") return TIPO_BIENES_SERVICIOS_606;
   if (key === "tipoRetencionIsr") return TIPO_RETENCION_ISR_606;
@@ -61,12 +63,20 @@ function dgiiListForColumn(tipo: Tipo, key: string): ExcelList | undefined {
   return undefined;
 }
 
+export function has606Retention(row: Record<string, unknown>): boolean {
+  return (
+    normalizeDgiiCode(row.tipoRetencionIsr, TIPO_RETENCION_ISR_606) !== "00" ||
+    numberValue(row.itbisRetenido) > 0 ||
+    numberValue(row.montoRetencionRenta) > 0
+  );
+}
+
 function displayValue(value: unknown, list?: ExcelList): string {
   const code = list ? normalizeDgiiCode(value, list) : String(value ?? "");
   return list && code in list ? `${code} - ${list[code]}` : code;
 }
 
-function addExcelDropdown(
+export function addExcelDropdown(
   sheet: ExcelJS.Worksheet,
   column: number,
   listColumn: number,
@@ -86,15 +96,23 @@ function addExcelDropdown(
   // Excel no permite usar directamente otra hoja como origen de validación.
   // Un nombre definido conserva el menú desplegable en el archivo descargado.
   const sourceRange = `'Listas DGII'!$${columnLetter(listColumn)}$2:$${columnLetter(listColumn)}$${labels.length + 1}`;
-  const sourceName = `DGII_606_LISTA_${listColumn}`;
+  const sourceName = `DGII_LISTA_${listColumn}`;
   sheet.workbook.definedNames.add(sourceRange, sourceName);
-  const finalRow = Math.max(lastDataRow + 100, 1000);
+  // El menú debe estar disponible desde la primera factura y en las filas
+  // siguientes para que se puedan corregir o agregar facturas manualmente.
+  const finalRow = Math.max(lastDataRow + 500, firstDataRow + 999);
+  sheet.getColumn(column).numFmt = "@";
   for (let row = firstDataRow; row <= finalRow; row += 1) {
     sheet.getCell(row, column).dataValidation = {
       type: "list",
       allowBlank: true,
+      showInputMessage: true,
+      promptTitle: "Opciones DGII",
+      prompt: "Selecciona una opción del menú para esta casilla.",
       showErrorMessage: true,
       errorStyle: "error",
+      errorTitle: "Opción no válida",
+      error: "Selecciona una opción del menú desplegable de esta casilla.",
       formulae: [sourceName],
     };
   }
@@ -109,9 +127,7 @@ function normalizeRetentionDates(tipo: Tipo, row: Record<string, unknown>): Reco
   const normalized = { ...row };
   const hasRetention =
     tipo === "606"
-      ? normalized.tipoRetencionIsr !== "00" ||
-        numberValue(normalized.itbisRetenido) > 0 ||
-        numberValue(normalized.montoRetencionRenta) > 0
+      ? has606Retention(normalized)
       : tipo === "607"
         ? numberValue(normalized.itbisRetenidoTerceros) > 0 ||
           numberValue(normalized.retencionRentaTerceros) > 0
@@ -151,23 +167,28 @@ export async function generateReport(
     if (!col) return "";
     const v = row[col.key as string];
     if (v === undefined || v === null || v === "") return "";
-    const list = dgiiListForColumn(tipo, col.key as string);
-    if (list) return normalizeDgiiCode(v, list);
     if (
       tipo === "606" &&
       col.key === "tipoRetencionIsr" &&
-      v === "00" &&
-      numberValue(row.itbisRetenido) === 0 &&
-      numberValue(row.montoRetencionRenta) === 0
+      !has606Retention(row)
     ) {
       return "";
     }
+    const list = dgiiListForColumn(tipo, col.key as string);
+    if (list) return normalizeDgiiCode(v, list);
     if (typeof v === "number") return blankZero && v === 0 ? "" : v.toFixed(2);
     return String(v);
   }
 
   function excelCellValue(row: Record<string, unknown>, key: string, header: string): string | number {
     const rawValue = row[key];
+    if (
+      tipo === "606" &&
+      key === "tipoRetencionIsr" &&
+      !has606Retention(row)
+    ) {
+      return "";
+    }
     const list = dgiiListForColumn(tipo, key);
     if (list) return normalizeDgiiCode(rawValue, list);
     // Los montos no aplicables se muestran vacíos en los reportes descargados.
@@ -222,12 +243,8 @@ export async function generateReport(
         if (c.key === "lineas") return String(idx + 1);
         if (c.key === "estatus") return "";
         const value = excelCellValue(row, c.key as string, c.header);
-        if (tipo === "606") {
-          if (c.key === "tipoBienesServicios") return displayValue(value, TIPO_BIENES_SERVICIOS_606);
-          if (c.key === "tipoId") return displayValue(value, TIPO_IDENTIFICACION);
-          if (c.key === "tipoRetencionIsr") return displayValue(value, TIPO_RETENCION_ISR_606);
-          if (c.key === "formaPago") return displayValue(value, FORMA_PAGO_606);
-        }
+        const list = dgiiListForColumn(tipo, c.key as string);
+        if (list) return displayValue(value, list);
         return value;
       })
     );
@@ -275,12 +292,12 @@ export async function generateReport(
     totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0F2FE" } };
   }
 
-  // Las listas desplegables son parte del Excel de Compras 606, igual que en
-  // la herramienta DGII. La hoja auxiliar queda oculta y no altera el TXT.
-  if (tipo === "606") {
-    const dropdowns: Array<[string, ExcelList]> = [
+  // Cada casilla con catálogos oficiales tiene su propio menú desplegable.
+  // La hoja auxiliar queda oculta y nunca altera el TXT de la DGII.
+  const dropdowns: Array<[string, ExcelList]> =
+    tipo === "606"
+      ? [
       ["tipoBienesServicios", TIPO_BIENES_SERVICIOS_606],
-      ["tipoId", TIPO_IDENTIFICACION],
       [
         "tipoRetencionIsr",
         Object.fromEntries(
@@ -288,7 +305,13 @@ export async function generateReport(
         ),
       ],
       ["formaPago", FORMA_PAGO_606],
-    ];
+      ]
+      : tipo === "607"
+        ? [
+          ["tipoIngreso", TIPO_INGRESO_607],
+        ]
+        : [];
+  if (dropdowns.length > 0) {
     dropdowns.forEach(([key, values], index) => {
       const column = columns.findIndex((item) => item.key === key) + 1;
       if (column > 0) {
@@ -331,13 +354,6 @@ export async function generateReport(
   [...columns, { key: "sumatoria", header: "Sumatoria" }].forEach((_, idx) => {
     sheet.getColumn(idx + 1).width = 20;
   });
-  if (tipo === "606") {
-    sheet.autoFilter = {
-      from: { row: headerRow.number, column: 1 },
-      to: { row: headerRow.number + normalizedRows.length, column: sumColumn },
-    };
-  }
-
   const xlsxBuffer = await workbook.xlsx.writeBuffer();
 
   // TXT: excluir columnas auxiliares
