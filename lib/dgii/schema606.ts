@@ -26,6 +26,9 @@ const formaPagoCodes = Object.keys(FORMA_PAGO_606) as [string, ...string[]];
 
 export const invoice606Schema = z.object({
   proveedor: z.string().describe("Nombre del proveedor/emisor de la factura; vacío si no aparece"),
+  moneda: z
+    .enum(["DOP", "USD"])
+    .describe("Moneda impresa en la factura: USD solo si indica US$, USD o dólares; DOP para pesos dominicanos o si no se indica."),
   rncCedula: z
     .string()
     .regex(/^\d{9}$|^\d{11}$/, "RNC (9 dígitos) o Cédula (11 dígitos) del proveedor"),

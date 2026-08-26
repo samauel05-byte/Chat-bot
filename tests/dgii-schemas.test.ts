@@ -6,7 +6,7 @@ import { z } from "zod";
 import { invoice606Schema } from "../lib/dgii/schema606";
 import { invoice607Schema } from "../lib/dgii/schema607";
 import { invoiceIR17Schema } from "../lib/dgii/schemaIR17";
-import { addExcelDropdown, has606Retention, normalizeDgiiCode } from "../lib/dgii/generateReport";
+import { addExcelDropdown, has606Retention, invoiceRowColor, normalizeDgiiCode } from "../lib/dgii/generateReport";
 import { TIPO_BIENES_SERVICIOS_606 } from "../lib/dgii/catalogs";
 
 const schemas = {
@@ -29,6 +29,7 @@ for (const [name, schema] of Object.entries(schemas)) {
 test("Formato 606: fechas de retención aceptan vacío", () => {
   const result = invoice606Schema.safeParse({
     proveedor: "Proveedor de prueba",
+    moneda: "DOP",
     rncCedula: "101010101",
     tipoId: "1",
     tipoBienesServicios: "02",
@@ -72,6 +73,11 @@ test("Formato 606: 00 - NINGUNA queda vacío si no existe retención", () => {
     has606Retention({ tipoRetencionIsr: "00", itbisRetenido: 18, montoRetencionRenta: 0 }),
     true
   );
+});
+
+test("Excel: una factura en USD se resalta en verde", () => {
+  assert.equal(invoiceRowColor("USD", 0), "FFC6EFCE");
+  assert.equal(invoiceRowColor("DOP", 0), "FFDDEBF7");
 });
 
 test("Excel 606: los menús desplegables comienzan en la primera factura", async () => {
