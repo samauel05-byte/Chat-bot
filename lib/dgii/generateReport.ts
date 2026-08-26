@@ -18,6 +18,8 @@ const COLUMNS: Record<Tipo, { key: string; header: string }[]> = {
   "IR17": COLUMNS_IR17,
 };
 
+export const EXCEL_AMOUNT_FORMAT = "#,##0.00";
+
 function columnLetter(columnNumber: number): string {
   let value = columnNumber;
   let letters = "";
@@ -39,6 +41,14 @@ export type GenerateReportResult = {
 
 function numberValue(value: unknown): number {
   return typeof value === "number" ? value : Number.parseFloat(String(value ?? "0")) || 0;
+}
+
+/** Total que se muestra desde la apertura y que las fórmulas de Excel recalculan al editar. */
+export function calculatedInvoiceTotal(tipo: Tipo, row: Record<string, unknown>): number {
+  if (tipo === "606") {
+    return numberValue(row.montoFacturadoServicios) + numberValue(row.montoFacturadoBienes);
+  }
+  return numberValue(row.montoFacturado ?? row.totalMontoFacturado);
 }
 
 type ExcelList = Record<string, string>;
@@ -114,10 +124,9 @@ export function addExcelDropdown(
       showInputMessage: true,
       promptTitle: "Opciones DGII",
       prompt: "Selecciona una opción del menú para esta casilla.",
-      showErrorMessage: true,
-      errorStyle: "error",
-      errorTitle: "Opción no válida",
-      error: "Selecciona una opción del menú desplegable de esta casilla.",
+      // El listado ayuda a corregir, pero nunca debe bloquear que el usuario
+      // pueda escribir o pegar un valor cuando esté revisando una factura.
+      showErrorMessage: false,
       formulae: [sourceName],
     };
   }
@@ -213,6 +222,18 @@ export async function generateReport(
     columns.findIndex((column) => column.key === "montoFacturado") + 1;
   const sumColumn = columns.length + 1;
   const firstDataRow = tipo === "606" ? 10 : 2;
+  const amountColumns = new Set<number>();
+  normalizedRows.forEach((row) => {
+    columns.forEach((column, index) => {
+      if (typeof row[column.key] === "number") amountColumns.add(index + 1);
+    });
+  });
+  // El formato se aplica a la columna completa para que un monto editado
+  // manualmente conserve separador de miles y dos decimales.
+  amountColumns.forEach((column) => {
+    sheet.getColumn(column).numFmt = EXCEL_AMOUNT_FORMAT;
+  });
+  sheet.getColumn(sumColumn).numFmt = EXCEL_AMOUNT_FORMAT;
 
   // El 606 replica la disposición de la hoja DIGITAR de la herramienta DGII.
   let headerRow: ExcelJS.Row;
@@ -242,7 +263,10 @@ export async function generateReport(
   headerRow.height = tipo === "606" ? 52 : 30;
 
   // Data rows (add line numbers)
+  const invoiceTotals: number[] = [];
   normalizedRows.forEach((row, idx) => {
+    const invoiceTotal = calculatedInvoiceTotal(tipo, row);
+    invoiceTotals.push(invoiceTotal);
     const dataRow = sheet.addRow(
       columns.map((c) => {
         if (c.key === "lineas") return String(idx + 1);
@@ -262,15 +286,17 @@ export async function generateReport(
         const totalCell = dataRow.getCell(totalAmountColumn);
         totalCell.value = {
           formula: `IF(SUM(${servicesAddress}:${goodsAddress})=0,"",SUM(${servicesAddress}:${goodsAddress}))`,
+          result: invoiceTotal === 0 ? "" : invoiceTotal,
         };
-        totalCell.numFmt = "#,##0.00";
+        totalCell.numFmt = EXCEL_AMOUNT_FORMAT;
       }
     }
     if (totalAmountColumn > 0) {
       dataRow.getCell(sumColumn).value = {
         formula: `IF(${dataRow.getCell(totalAmountColumn).address}=0,"",${dataRow.getCell(totalAmountColumn).address})`,
+        result: invoiceTotal === 0 ? "" : invoiceTotal,
       };
-      dataRow.getCell(sumColumn).numFmt = "#,##0.00";
+      dataRow.getCell(sumColumn).numFmt = EXCEL_AMOUNT_FORMAT;
     }
     if (tipo === "606" || tipo === "607") {
       // Las facturas en dólares se destacan para que se revisen antes de la
@@ -289,12 +315,14 @@ export async function generateReport(
   // Columna auxiliar visible en Excel: facilita revisar cada total de factura y
   // una suma final del lote sin modificar las columnas oficiales de la DGII.
   if (tipo !== "IR17" && normalizedRows.length > 0 && totalAmountColumn > 0) {
+    const batchTotal = invoiceTotals.reduce((sum, invoiceTotal) => sum + invoiceTotal, 0);
     const totalRow = sheet.addRow(columns.map(() => ""));
     totalRow.getCell(Math.max(1, sumColumn - 1)).value = "TOTAL FACTURAS";
     totalRow.getCell(sumColumn).value = {
       formula: `IF(SUM(${columnLetter(sumColumn)}${firstDataRow}:${columnLetter(sumColumn)}${totalRow.number - 1})=0,"",SUM(${columnLetter(sumColumn)}${firstDataRow}:${columnLetter(sumColumn)}${totalRow.number - 1}))`,
+      result: batchTotal === 0 ? "" : batchTotal,
     };
-    totalRow.getCell(sumColumn).numFmt = "#,##0.00";
+    totalRow.getCell(sumColumn).numFmt = EXCEL_AMOUNT_FORMAT;
     totalRow.font = { bold: true };
     totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0F2FE" } };
   }
@@ -348,7 +376,7 @@ export async function generateReport(
             const v = r[c.key as string];
             return acc + (typeof v === "number" ? v : parseFloat(String(v ?? "0")) || 0);
           }, 0);
-          return sum.toFixed(2);
+          return sum;
         }
         return "";
       })

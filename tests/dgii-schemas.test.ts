@@ -6,7 +6,7 @@ import { z } from "zod";
 import { invoice606Schema } from "../lib/dgii/schema606";
 import { invoice607Schema } from "../lib/dgii/schema607";
 import { invoiceIR17Schema } from "../lib/dgii/schemaIR17";
-import { addExcelDropdown, has606Retention, invoiceRowColor, normalizeDgiiCode } from "../lib/dgii/generateReport";
+import { addExcelDropdown, calculatedInvoiceTotal, EXCEL_AMOUNT_FORMAT, has606Retention, invoiceRowColor, normalizeDgiiCode } from "../lib/dgii/generateReport";
 import { TIPO_BIENES_SERVICIOS_606 } from "../lib/dgii/catalogs";
 
 const schemas = {
@@ -80,6 +80,29 @@ test("Excel: una factura en USD se resalta en verde", () => {
   assert.equal(invoiceRowColor("DOP", 0), "FFDDEBF7");
 });
 
+test("Excel: los montos conservan miles y dos decimales al editar", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("606");
+  sheet.getColumn(1).numFmt = EXCEL_AMOUNT_FORMAT;
+  sheet.getCell("A1").value = 1675.5;
+
+  const saved = await workbook.xlsx.writeBuffer();
+  const reloaded = new ExcelJS.Workbook();
+  await reloaded.xlsx.load(saved);
+  const cell = reloaded.getWorksheet("606")!.getCell("A1");
+
+  assert.equal(cell.numFmt, "#,##0.00");
+  assert.equal(cell.value, 1675.5);
+});
+
+test("Excel: la sumatoria parte de los importes correctos", () => {
+  assert.equal(
+    calculatedInvoiceTotal("606", { montoFacturadoServicios: 1675.5, montoFacturadoBienes: 324.5 }),
+    2000
+  );
+  assert.equal(calculatedInvoiceTotal("607", { montoFacturado: 1675.5 }), 1675.5);
+});
+
 test("Excel 606: los menús desplegables comienzan en la primera factura", async () => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("DIGITAR");
@@ -90,6 +113,8 @@ test("Excel 606: los menús desplegables comienzan en la primera factura", async
   await reloaded.xlsx.load(await workbook.xlsx.writeBuffer());
   const validation = reloaded.getWorksheet("DIGITAR")?.getCell("E10").dataValidation;
   assert.equal(validation?.type, "list");
+  assert.notEqual(validation?.showErrorMessage, true);
+  assert.equal(validation?.allowBlank, true);
   assert.deepEqual(validation?.formulae, ["DGII_LISTA_1"]);
   assert.equal(reloaded.getWorksheet("DIGITAR")?.getCell("E1009").dataValidation.type, "list");
 });
