@@ -43,8 +43,26 @@ function numberValue(value: unknown): number {
 
 type ExcelList = Record<string, string>;
 
+/** Mantiene los códigos DGII como texto de dos dígitos, aun si fueron leídos como 2. */
+export function normalizeDgiiCode(value: unknown, list: ExcelList): string {
+  const raw = String(value ?? "").trim();
+  const matched = raw.match(/^(\d{1,2})(?:\s*-\s*.*)?$/);
+  if (!matched) return raw;
+
+  const code = matched[1].padStart(2, "0");
+  return code in list ? code : raw;
+}
+
+function dgiiListForColumn(tipo: Tipo, key: string): ExcelList | undefined {
+  if (tipo !== "606") return undefined;
+  if (key === "tipoBienesServicios") return TIPO_BIENES_SERVICIOS_606;
+  if (key === "tipoRetencionIsr") return TIPO_RETENCION_ISR_606;
+  if (key === "formaPago") return FORMA_PAGO_606;
+  return undefined;
+}
+
 function displayValue(value: unknown, list?: ExcelList): string {
-  const code = String(value ?? "");
+  const code = list ? normalizeDgiiCode(value, list) : String(value ?? "");
   return list && code in list ? `${code} - ${list[code]}` : code;
 }
 
@@ -133,6 +151,8 @@ export async function generateReport(
     if (!col) return "";
     const v = row[col.key as string];
     if (v === undefined || v === null || v === "") return "";
+    const list = dgiiListForColumn(tipo, col.key as string);
+    if (list) return normalizeDgiiCode(v, list);
     if (
       tipo === "606" &&
       col.key === "tipoRetencionIsr" &&
@@ -146,10 +166,15 @@ export async function generateReport(
     return String(v);
   }
 
-  function excelCellValue(row: Record<string, unknown>, key: string, header: string): string {
+  function excelCellValue(row: Record<string, unknown>, key: string, header: string): string | number {
     const rawValue = row[key];
+    const list = dgiiListForColumn(tipo, key);
+    if (list) return normalizeDgiiCode(rawValue, list);
     // Los montos no aplicables se muestran vacíos en los reportes descargados.
     if (typeof rawValue === "number" && rawValue === 0) return "";
+    // Los montos deben ser números de Excel, no texto: así sus fórmulas y
+    // sumatorias se recalculan correctamente cuando se corrige una fila.
+    if (typeof rawValue === "number") return rawValue;
     return cellValue(row, header, true);
   }
 
@@ -206,6 +231,19 @@ export async function generateReport(
         return value;
       })
     );
+    if (tipo === "606" && totalAmountColumn > 0) {
+      const servicesColumn = columns.findIndex((column) => column.key === "montoFacturadoServicios") + 1;
+      const goodsColumn = columns.findIndex((column) => column.key === "montoFacturadoBienes") + 1;
+      if (servicesColumn > 0 && goodsColumn > 0) {
+        const servicesAddress = dataRow.getCell(servicesColumn).address;
+        const goodsAddress = dataRow.getCell(goodsColumn).address;
+        const totalCell = dataRow.getCell(totalAmountColumn);
+        totalCell.value = {
+          formula: `IF(SUM(${servicesAddress}:${goodsAddress})=0,"",SUM(${servicesAddress}:${goodsAddress}))`,
+        };
+        totalCell.numFmt = "#,##0.00";
+      }
+    }
     if (totalAmountColumn > 0) {
       dataRow.getCell(sumColumn).value = {
         formula: `IF(${dataRow.getCell(totalAmountColumn).address}=0,"",${dataRow.getCell(totalAmountColumn).address})`,
