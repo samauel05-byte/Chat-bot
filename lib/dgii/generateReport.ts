@@ -71,6 +71,11 @@ export function has606Retention(row: Record<string, unknown>): boolean {
   );
 }
 
+export function invoiceRowColor(moneda: unknown, rowIndex: number): string {
+  if (String(moneda ?? "").toUpperCase() === "USD") return "FFC6EFCE";
+  return rowIndex % 2 === 0 ? "FFDDEBF7" : "FFFFFFFF";
+}
+
 function displayValue(value: unknown, list?: ExcelList): string {
   const code = list ? normalizeDgiiCode(value, list) : String(value ?? "");
   return list && code in list ? `${code} - ${list[code]}` : code;
@@ -268,7 +273,9 @@ export async function generateReport(
       dataRow.getCell(sumColumn).numFmt = "#,##0.00";
     }
     if (tipo === "606" || tipo === "607") {
-      const color = idx % 2 === 0 ? "FFDDEBF7" : "FFFFFFFF";
+      // Las facturas en dólares se destacan para que se revisen antes de la
+      // declaración, sin agregar columnas fuera del formato oficial DGII.
+      const color = invoiceRowColor(row.moneda, idx);
       for (let column = 1; column <= sumColumn; column += 1) {
         dataRow.getCell(column).fill = {
           type: "pattern",

@@ -19,6 +19,9 @@ const tipoIngresoCodes = Object.keys(TIPO_INGRESO_607) as [string, ...string[]];
 
 export const invoice607Schema = z.object({
   cliente: z.string().describe("Nombre del cliente/receptor o vacío si no aparece"),
+  moneda: z
+    .enum(["DOP", "USD"])
+    .describe("Moneda impresa en la factura: USD solo si indica US$, USD o dólares; DOP para pesos dominicanos o si no se indica."),
   rncCedulaPasaporte: z
     .string()
     .regex(/^\d{9}$|^\d{11}$|^$/, "RNC, Cédula o vacío"),
