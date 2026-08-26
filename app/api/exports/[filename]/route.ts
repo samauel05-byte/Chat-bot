@@ -8,6 +8,12 @@ const CONTENT_TYPES: Record<string, string> = {
   ".txt": "text/plain; charset=utf-8",
 };
 
+function downloadFilename(filename: string): string {
+  // El Blob conserva un sufijo único para evitar sobreescrituras, pero ese
+  // detalle técnico no debe aparecer en el archivo que recibe el cliente.
+  return filename.replace(/^(ModeloExcel_\d{6})_[a-f0-9]{12}(\.xlsx)$/i, "$1$2");
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ filename: string }> }
@@ -26,11 +32,12 @@ export async function GET(
 
   const ext = path.extname(filename).toLowerCase();
   const contentType = CONTENT_TYPES[ext] ?? "application/octet-stream";
+  const displayFilename = downloadFilename(filename);
 
   return new NextResponse(result.stream, {
     headers: {
       "Content-Type": contentType,
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": `attachment; filename="${displayFilename}"`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
     },
