@@ -5,6 +5,8 @@ import { z } from "zod";
 import { invoice606Schema } from "../lib/dgii/schema606";
 import { invoice607Schema } from "../lib/dgii/schema607";
 import { invoiceIR17Schema } from "../lib/dgii/schemaIR17";
+import { normalizeDgiiCode } from "../lib/dgii/generateReport";
+import { TIPO_BIENES_SERVICIOS_606 } from "../lib/dgii/catalogs";
 
 const schemas = {
   "Formato 606": invoice606Schema,
@@ -53,4 +55,9 @@ test("Formato 606: fechas de retención aceptan vacío", () => {
     formaPago: "01",
   });
   assert.equal(result.success, true);
+});
+
+test("Formato 606: los códigos de bienes conservan el cero a la izquierda", () => {
+  assert.equal(normalizeDgiiCode("2", TIPO_BIENES_SERVICIOS_606), "02");
+  assert.equal(normalizeDgiiCode("02 - GASTOS POR TRABAJOS, SUMINISTROS Y SERVICIOS", TIPO_BIENES_SERVICIOS_606), "02");
 });
