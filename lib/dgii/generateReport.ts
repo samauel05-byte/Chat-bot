@@ -408,9 +408,10 @@ export async function generateReport(
   // A unique suffix prevents simultaneous users from overwriting each other's
   // exports for the same form and period.
   const reportId = randomUUID().replaceAll("-", "").slice(0, 12);
-  const basename = `${tipo}_${periodo}_${reportId}`;
-  const xlsxPathname = `${EXPORTS_PREFIX}${basename}.xlsx`;
-  const txtPathname = `${EXPORTS_PREFIX}${basename}.txt`;
+  // El identificador interno evita choques entre usuarios, mientras que la
+  // descarga muestra un nombre simple y profesional: ModeloExcel_YYYYMM.xlsx.
+  const xlsxPathname = `${EXPORTS_PREFIX}ModeloExcel_${periodo}_${reportId}.xlsx`;
+  const txtPathname = `${EXPORTS_PREFIX}${tipo}_${periodo}_${reportId}.txt`;
 
   await put(xlsxPathname, xlsxBuffer, {
     access: "private",
