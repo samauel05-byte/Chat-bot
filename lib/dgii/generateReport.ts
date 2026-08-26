@@ -220,6 +220,8 @@ export async function generateReport(
   const totalAmountColumn =
     columns.findIndex((column) => column.key === "totalMontoFacturado") + 1 ||
     columns.findIndex((column) => column.key === "montoFacturado") + 1;
+  const servicesColumn = columns.findIndex((column) => column.key === "montoFacturadoServicios") + 1;
+  const goodsColumn = columns.findIndex((column) => column.key === "montoFacturadoBienes") + 1;
   const sumColumn = columns.length + 1;
   const firstDataRow = tipo === "606" ? 10 : 2;
   const amountColumns = new Set<number>();
@@ -278,8 +280,6 @@ export async function generateReport(
       })
     );
     if (tipo === "606" && totalAmountColumn > 0) {
-      const servicesColumn = columns.findIndex((column) => column.key === "montoFacturadoServicios") + 1;
-      const goodsColumn = columns.findIndex((column) => column.key === "montoFacturadoBienes") + 1;
       if (servicesColumn > 0 && goodsColumn > 0) {
         const servicesAddress = dataRow.getCell(servicesColumn).address;
         const goodsAddress = dataRow.getCell(goodsColumn).address;
@@ -292,8 +292,14 @@ export async function generateReport(
       }
     }
     if (totalAmountColumn > 0) {
+      const sumatoriaFormula =
+        tipo === "606" && servicesColumn > 0 && goodsColumn > 0
+          ? `IF(SUM(${dataRow.getCell(servicesColumn).address}:${dataRow.getCell(goodsColumn).address})=0,"",SUM(${dataRow.getCell(servicesColumn).address}:${dataRow.getCell(goodsColumn).address}))`
+          : `IF(${dataRow.getCell(totalAmountColumn).address}=0,"",${dataRow.getCell(totalAmountColumn).address})`;
       dataRow.getCell(sumColumn).value = {
-        formula: `IF(${dataRow.getCell(totalAmountColumn).address}=0,"",${dataRow.getCell(totalAmountColumn).address})`,
+        // En 606 suma directamente Servicios + Bienes, de modo que la casilla
+        // verde no dependa de un total anterior si el usuario corrige los montos.
+        formula: sumatoriaFormula,
         result: invoiceTotal === 0 ? "" : invoiceTotal,
       };
       dataRow.getCell(sumColumn).numFmt = EXCEL_AMOUNT_FORMAT;
