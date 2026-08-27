@@ -59,7 +59,7 @@ export function LoginForm() {
           <input required minLength={3} value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))} className="mt-1 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-3 outline-none focus:border-violet-400" />
         </label>}
         <label className="mt-6 block text-sm">{isNew ? "Correo electrónico" : "Usuario o correo"}
-          <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-3 outline-none focus:border-violet-400" />
+          <input required type={isNew ? "email" : "text"} autoCapitalize="none" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-3 outline-none focus:border-violet-400" />
         </label>
         <label className="mt-4 block text-sm">Contraseña
           <input required minLength={8} type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-3 outline-none focus:border-violet-400" />
