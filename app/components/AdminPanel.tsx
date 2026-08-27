@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 type Company = { id: string; name: string; license_expires_at: string; license_status: string };
-type Profile = { id: string; full_name: string | null; company_id: string | null };
+type Profile = { id: string; full_name: string | null; username: string | null; company_id: string | null; companies?: { name: string } | { name: string }[] | null };
 
 export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -21,7 +21,7 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
     const supabase = createClient();
     const [companyResult, profileResult] = await Promise.all([
       supabase.from("companies").select("id, name, license_expires_at, license_status").order("created_at", { ascending: false }),
-      supabase.from("profiles").select("id, full_name, company_id").eq("role", "client").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, full_name, username, company_id, companies(name)").eq("role", "client").order("created_at", { ascending: false }),
     ]);
     setCompanies((companyResult.data as Company[] | null) ?? []);
     setProfiles((profileResult.data as Profile[] | null) ?? []);
@@ -84,6 +84,7 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
       <h3 className="mt-6 font-semibold">Crear usuario para una empresa</h3><form onSubmit={createUser} className="mt-2 grid gap-2 sm:grid-cols-2"><input required minLength={3} value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Correo" className="rounded border p-2"/><input required minLength={8} type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Contraseña inicial" className="rounded border p-2"/><select required value={companyId} onChange={e=>setCompanyId(e.target.value)} className="rounded border p-2"><option value="">Empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button className="rounded bg-slate-900 px-3 py-2 font-semibold text-white sm:col-span-2">Crear y activar usuario</button></form>
       {status && <p className="mt-3 text-sm text-violet-700">{status}</p>}
       <h3 className="mt-6 font-semibold">Cuentas pendientes</h3><div className="mt-2 space-y-2">{profiles.filter(p=>!p.company_id).map(p=><div key={p.id} className="flex flex-wrap gap-2 rounded border p-2 text-sm"><span className="flex-1">{p.full_name || "Cliente sin nombre"}</span><select defaultValue="" onChange={e=>e.target.value && void assign(p.id,e.target.value)} className="rounded border p-1"><option value="">Activar en empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>)}</div>
+      <h3 className="mt-6 font-semibold">Usuarios creados</h3><div className="mt-2 space-y-2">{profiles.filter(p=>p.company_id).map(p=>{const company = Array.isArray(p.companies) ? p.companies[0] : p.companies; return <div key={p.id} className="rounded border p-3 text-sm"><b>{p.username || "Sin usuario"}</b>{p.full_name && <span> · {p.full_name}</span>}<br/><span className="text-slate-600">Empresa: {company?.name || "Sin empresa"}</span></div>})}{profiles.filter(p=>p.company_id).length === 0 && <p className="text-sm text-slate-500">Aún no hay usuarios asignados a una empresa.</p>}</div>
       <h3 className="mt-6 font-semibold">Empresas</h3><div className="mt-2 space-y-2">{companies.map(c=><div key={c.id} className="flex flex-wrap items-center gap-2 rounded border p-3 text-sm"><span className="min-w-40 flex-1"><b>{c.name}</b><br/>Vence: {new Intl.DateTimeFormat("es-DO", {dateStyle:"medium"}).format(new Date(c.license_expires_at))}</span><button onClick={()=>void editCompany(c)} className="rounded bg-sky-600 px-3 py-2 font-semibold text-white">Editar</button><button onClick={()=>void deleteCompany(c)} className="rounded bg-rose-600 px-3 py-2 font-semibold text-white">Eliminar</button><button onClick={()=>void renew(c.id)} className="rounded bg-emerald-600 px-3 py-2 font-semibold text-white">Marcar pagado · 30 días</button></div>)}</div>
     </section></div>}
   </>;
