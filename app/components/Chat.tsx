@@ -101,7 +101,7 @@ async function splitLongPdf(file: File): Promise<File[]> {
   }
 }
 
-export function Chat({ quotaContext }: { quotaContext: QuotaContext }) {
+export function Chat({ quotaContext, accountName, onOpenAccount, onOpenAdmin }: { quotaContext: QuotaContext; accountName: string; onOpenAccount: () => void; onOpenAdmin?: () => void }) {
   const transport = useTriggerChatTransport<typeof invoiceChat>({
     task: "invoice-chat",
     clientData: quotaContext,
@@ -284,6 +284,10 @@ export function Chat({ quotaContext }: { quotaContext: QuotaContext }) {
               🤖 Automatiza la preparación de información para la DGII
             </p>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {onOpenAdmin && <button type="button" onClick={onOpenAdmin} className="rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-300">☰ Administración</button>}
+          <button type="button" onClick={onOpenAccount} className="rounded-lg border border-black/10 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-white/15 dark:text-neutral-200 dark:hover:bg-white/10">👤 {accountName}<span className="ml-2 text-xs font-normal">Cambiar clave</span></button>
         </div>
       </header>
 
