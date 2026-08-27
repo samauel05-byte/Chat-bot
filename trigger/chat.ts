@@ -86,8 +86,12 @@ async function generateLimitedReport(
   rows: Record<string, unknown>[],
   companyId = getCompanyIdFromChatContext()
 ) {
-  await consumeInvoiceQuota(companyId, periodo, rows.length);
-  return generateReport(tipo, periodo, rows);
+  // El cobro y el límite se registran únicamente después de que ambos archivos
+  // fueron creados. Así se factura exactamente la cantidad que aparece en el
+  // Excel/TXT final, nunca PDFs subidos ni una exportación fallida.
+  const report = await generateReport(tipo, periodo, rows);
+  await consumeInvoiceQuota(companyId, periodo, report.recordCount);
+  return report;
 }
 
 function getTextContent(message: ModelMessage): string {
