@@ -7,7 +7,7 @@ import { invoice606Schema } from "../lib/dgii/schema606";
 import { invoice607Schema } from "../lib/dgii/schema607";
 import { invoiceIR17Schema } from "../lib/dgii/schemaIR17";
 import { addExcelDropdown, calculatedInvoiceTotal, EXCEL_AMOUNT_FORMAT, has606Retention, invoiceRowColor, normalizeDgiiCode } from "../lib/dgii/generateReport";
-import { TIPO_BIENES_SERVICIOS_606 } from "../lib/dgii/catalogs";
+import { FORMA_PAGO_606, TIPO_BIENES_SERVICIOS_606 } from "../lib/dgii/catalogs";
 
 const schemas = {
   "Formato 606": invoice606Schema,
@@ -117,4 +117,17 @@ test("Excel 606: los menús desplegables comienzan en la primera factura", async
   assert.equal(validation?.allowBlank, true);
   assert.deepEqual(validation?.formulae, ["DGII_LISTA_1"]);
   assert.equal(reloaded.getWorksheet("DIGITAR")?.getCell("E1009").dataValidation.type, "list");
+});
+
+test("Excel 606: Forma de Pago usa un menú compatible dentro de la celda", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("DIGITAR");
+  workbook.addWorksheet("Listas DGII");
+  addExcelDropdown(sheet, 27, 1, FORMA_PAGO_606, 10, 10);
+
+  const reloaded = new ExcelJS.Workbook();
+  await reloaded.xlsx.load(await workbook.xlsx.writeBuffer());
+  const validation = reloaded.getWorksheet("DIGITAR")?.getCell("AA10").dataValidation;
+  assert.equal(validation?.type, "list");
+  assert.match(String(validation?.formulae?.[0]), /^"01 - EFECTIVO,/);
 });

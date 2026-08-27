@@ -113,6 +113,13 @@ export function addExcelDropdown(
   const sourceRange = `'Listas DGII'!$${columnLetter(listColumn)}$2:$${columnLetter(listColumn)}$${labels.length + 1}`;
   const sourceName = `DGII_LISTA_${listColumn}`;
   sheet.workbook.definedNames.add(sourceRange, sourceName);
+  // Las opciones cortas (por ejemplo, Forma de Pago) se guardan directamente
+  // en la validación. Esto evita que Excel pierda el menú por depender de una
+  // hoja auxiliar oculta. Los catálogos extensos usan el nombre definido.
+  const directList = labels.join(",");
+  const listFormula = directList.length <= 255 && !labels.some((label) => label.includes(","))
+    ? `"${directList}"`
+    : sourceName;
   // El menú debe estar disponible desde la primera factura y en las filas
   // siguientes para que se puedan corregir o agregar facturas manualmente.
   const finalRow = Math.max(lastDataRow + 500, firstDataRow + 999);
@@ -127,7 +134,7 @@ export function addExcelDropdown(
       // El listado ayuda a corregir, pero nunca debe bloquear que el usuario
       // pueda escribir o pegar un valor cuando esté revisando una factura.
       showErrorMessage: false,
-      formulae: [sourceName],
+      formulae: [listFormula],
     };
   }
 }
@@ -366,7 +373,9 @@ export async function generateReport(
         );
       }
     });
-    listSheet.state = "veryHidden";
+    // "hidden" mantiene los catálogos fuera de vista y conserva compatibilidad
+    // con Excel de escritorio, web y otras aplicaciones de hojas de cálculo.
+    listSheet.state = "hidden";
   } else {
     workbook.removeWorksheet(listSheet.id);
   }
