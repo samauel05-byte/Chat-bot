@@ -13,6 +13,8 @@
   "dependencies": {
     "@ai-sdk/openai": "^4.0.46",
     "@ai-sdk/react": "^4.0.73",
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.112.4",
     "@trigger.dev/sdk": "^4.5.12",
     "@vercel/blob": "^2.8.0",
     "ai": "^7.0.70",
