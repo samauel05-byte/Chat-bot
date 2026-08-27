@@ -48,6 +48,21 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
     setStatus(error ? "No se pudo renovar la licencia." : "Licencia renovada por 30 días.");
     await load();
   }
+  async function editCompany(company: Company) {
+    const name = window.prompt("Nombre de la empresa", company.name)?.trim();
+    if (!name || name === company.name) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("companies").update({ name }).eq("id", company.id);
+    setStatus(error ? "No se pudo editar la empresa." : "Empresa actualizada.");
+    await load();
+  }
+  async function deleteCompany(company: Company) {
+    if (!window.confirm(`¿Eliminar “${company.name}”? Sus usuarios quedarán sin empresa y perderán acceso hasta ser reasignados.`)) return;
+    const supabase = createClient();
+    const { error } = await supabase.from("companies").delete().eq("id", company.id);
+    setStatus(error ? "No se pudo eliminar la empresa." : "Empresa eliminada.");
+    await load();
+  }
   async function assign(profileId: string, companyId: string) {
     const supabase = createClient();
     const { error } = await supabase.from("profiles").update({ company_id: companyId }).eq("id", profileId);
@@ -69,7 +84,7 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
       <h3 className="mt-6 font-semibold">Crear usuario para una empresa</h3><form onSubmit={createUser} className="mt-2 grid gap-2 sm:grid-cols-2"><input required minLength={3} value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Correo" className="rounded border p-2"/><input required minLength={8} type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Contraseña inicial" className="rounded border p-2"/><select required value={companyId} onChange={e=>setCompanyId(e.target.value)} className="rounded border p-2"><option value="">Empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button className="rounded bg-slate-900 px-3 py-2 font-semibold text-white sm:col-span-2">Crear y activar usuario</button></form>
       {status && <p className="mt-3 text-sm text-violet-700">{status}</p>}
       <h3 className="mt-6 font-semibold">Cuentas pendientes</h3><div className="mt-2 space-y-2">{profiles.filter(p=>!p.company_id).map(p=><div key={p.id} className="flex flex-wrap gap-2 rounded border p-2 text-sm"><span className="flex-1">{p.full_name || "Cliente sin nombre"}</span><select defaultValue="" onChange={e=>e.target.value && void assign(p.id,e.target.value)} className="rounded border p-1"><option value="">Activar en empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>)}</div>
-      <h3 className="mt-6 font-semibold">Empresas</h3><div className="mt-2 space-y-2">{companies.map(c=><div key={c.id} className="flex items-center gap-3 rounded border p-3 text-sm"><span className="flex-1"><b>{c.name}</b><br/>Vence: {new Intl.DateTimeFormat("es-DO", {dateStyle:"medium"}).format(new Date(c.license_expires_at))}</span><button onClick={()=>void renew(c.id)} className="rounded bg-emerald-600 px-3 py-2 font-semibold text-white">Marcar pagado · 30 días</button></div>)}</div>
+      <h3 className="mt-6 font-semibold">Empresas</h3><div className="mt-2 space-y-2">{companies.map(c=><div key={c.id} className="flex flex-wrap items-center gap-2 rounded border p-3 text-sm"><span className="min-w-40 flex-1"><b>{c.name}</b><br/>Vence: {new Intl.DateTimeFormat("es-DO", {dateStyle:"medium"}).format(new Date(c.license_expires_at))}</span><button onClick={()=>void editCompany(c)} className="rounded bg-sky-600 px-3 py-2 font-semibold text-white">Editar</button><button onClick={()=>void deleteCompany(c)} className="rounded bg-rose-600 px-3 py-2 font-semibold text-white">Eliminar</button><button onClick={()=>void renew(c.id)} className="rounded bg-emerald-600 px-3 py-2 font-semibold text-white">Marcar pagado · 30 días</button></div>)}</div>
     </section></div>}
   </>;
 }
