@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 const LETTERS = ["N", "A", "L", "A"];
@@ -46,14 +46,15 @@ type Phase = "letters" | "acronym" | "tagline" | "done";
 export function Splash({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<Phase>("letters");
   const [exiting, setExiting] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase("acronym"), 900),
-      setTimeout(() => setPhase("tagline"), 1900),
-      setTimeout(() => setPhase("done"), 3400),
-      setTimeout(() => setExiting(true), 3500),
-      setTimeout(onDone, 4200),
+      setTimeout(() => setPhase("acronym"), 1150),
+      setTimeout(() => setPhase("tagline"), 2650),
+      setTimeout(() => setPhase("done"), 5000),
+      setTimeout(() => setExiting(true), 5250),
+      setTimeout(onDone, 6000),
     ];
     return () => timers.forEach(clearTimeout);
   }, [onDone]);
@@ -108,7 +109,21 @@ export function Splash({ onDone }: { onDone: () => void }) {
 
           {/* ── Ambient glow ── */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-[500px] w-[500px] rounded-full bg-violet-600/20 blur-[120px]" />
+            <motion.div
+              className="absolute h-[500px] w-[500px] rounded-full bg-violet-600/20 blur-[120px]"
+              animate={shouldReduceMotion ? undefined : { scale: [0.92, 1.14, 0.98], opacity: [0.42, 0.88, 0.5] }}
+              transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.div
+              className="h-[360px] w-[360px] rounded-full border border-violet-300/15"
+              animate={shouldReduceMotion ? undefined : { rotate: 360, scale: [1, 1.08, 1] }}
+              transition={{ rotate: { duration: 20, repeat: Infinity, ease: "linear" }, scale: { duration: 4.5, repeat: Infinity, ease: "easeInOut" } }}
+            />
+            <motion.div
+              className="absolute h-[250px] w-[250px] rounded-full border border-cyan-300/10"
+              animate={shouldReduceMotion ? undefined : { rotate: -360 }}
+              transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
+            />
           </div>
 
           {/* ── NALA letters ── */}
@@ -118,17 +133,36 @@ export function Splash({ onDone }: { onDone: () => void }) {
                 key={i}
                 className="text-7xl font-black tracking-tight text-white sm:text-[9rem] drop-shadow-2xl"
                 initial={{ opacity: 0, y: 60, filter: "blur(12px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                animate={{
+                  opacity: 1,
+                  y: shouldReduceMotion ? 0 : [0, -5, 0],
+                  scale: shouldReduceMotion ? 1 : [1, 1.035, 1],
+                  filter: "blur(0px)",
+                }}
                 transition={{
                   delay: i * 0.12,
-                  duration: 0.55,
+                  duration: 0.62,
                   ease: [0.16, 1, 0.3, 1],
+                  ...(shouldReduceMotion ? {} : { repeat: Infinity, repeatDelay: 1.8 + i * 0.12 }),
                 }}
               >
                 {letter}
               </motion.span>
             ))}
           </div>
+
+          <motion.div
+            className="relative mt-4 h-px w-32 overflow-hidden bg-violet-400/25"
+            initial={{ opacity: 0, scaleX: 0 }}
+            animate={{ opacity: active ? 1 : 0, scaleX: active ? 1 : 0 }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
+          >
+            <motion.span
+              className="absolute inset-y-0 w-12 bg-gradient-to-r from-transparent via-cyan-200 to-transparent"
+              animate={shouldReduceMotion ? undefined : { x: [-48, 128] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }}
+            />
+          </motion.div>
 
           {/* ── Acronym breakdown ── */}
           <motion.div
