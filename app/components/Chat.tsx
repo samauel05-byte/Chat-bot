@@ -271,27 +271,27 @@ export function Chat({ quotaContext, accountName, onOpenAccount, onOpenAdmin }: 
         </div>
       )}
 
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 bg-white px-5 py-4 shadow-sm dark:border-white/10 dark:bg-neutral-900">
+      <header className="flex flex-col gap-3 border-b border-black/5 bg-white px-3 py-3 shadow-sm dark:border-white/10 dark:bg-neutral-900 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center sm:h-14 sm:w-14">
-            <Image src="/logo.svg" alt="NALA" width={56} height={56} priority />
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center sm:h-14 sm:w-14">
+            <Image src="/logo.svg" alt="NALA" width={56} height={56} priority className="h-11 w-11 sm:h-14 sm:w-14" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50 sm:text-base">
-              NALA — Núcleo Automatizado de Listados Administrativos
+            <h1 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50 sm:text-base lg:text-lg">
+              <span className="sm:hidden">NALA</span><span className="hidden sm:inline">NALA — Núcleo Automatizado de Listados Administrativos</span>
             </h1>
-            <p className="hidden text-xs text-neutral-500 dark:text-neutral-400 sm:block">
+            <p className="hidden text-xs text-neutral-500 dark:text-neutral-400 md:block">
               🤖 Automatiza la preparación de información para la DGII
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {onOpenAdmin && <button type="button" onClick={onOpenAdmin} className="rounded-lg border border-violet-200 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-300">☰ Administración</button>}
-          <button type="button" onClick={onOpenAccount} className="rounded-lg border border-black/10 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-white/15 dark:text-neutral-200 dark:hover:bg-white/10">👤 {accountName}<span className="ml-2 text-xs font-normal">Cambiar clave</span></button>
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          {onOpenAdmin && <button type="button" onClick={onOpenAdmin} className="flex-1 rounded-lg border border-violet-200 px-2.5 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-300 sm:flex-none sm:px-3 sm:text-sm">☰ <span className="sm:hidden">Admin</span><span className="hidden sm:inline">Administración</span></button>}
+          <button type="button" onClick={onOpenAccount} className="min-w-0 flex-1 truncate rounded-lg border border-black/10 px-2.5 py-2 text-left text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-white/15 dark:text-neutral-200 dark:hover:bg-white/10 sm:flex-none sm:px-3 sm:text-sm">👤 <span className="inline-block max-w-28 truncate align-bottom sm:max-w-36">{accountName}</span><span className="ml-2 hidden text-xs font-normal lg:inline">Cambiar clave</span></button>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+      <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
         {messages.length === 0 && <WelcomeCard />}
 
         <div className="mx-auto flex max-w-2xl flex-col gap-5">
@@ -446,11 +446,11 @@ export function Chat({ quotaContext, accountName, onOpenAccount, onOpenAdmin }: 
 
       <form
         onSubmit={handleSubmit}
-        className="border-t border-black/5 bg-white px-4 py-3 shadow-[0_-1px_8px_rgba(0,0,0,0.03)] dark:border-white/10 dark:bg-neutral-900 sm:px-8"
+        className="border-t border-black/5 bg-white px-3 py-3 shadow-[0_-1px_8px_rgba(0,0,0,0.03)] dark:border-white/10 dark:bg-neutral-900 sm:px-6 lg:px-8"
       >
         <div className="mx-auto max-w-2xl">
-          <div className="mb-2.5 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+          <div className="mb-2.5 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center">
+            <span className="col-span-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 sm:col-auto">
               Leer factura como:
             </span>
             <button
@@ -458,7 +458,7 @@ export function Chat({ quotaContext, accountName, onOpenAccount, onOpenAdmin }: 
               aria-pressed={mode === "606"}
               onClick={() => setMode((m) => (m === "606" ? null : "606"))}
               className={
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
+                "min-w-0 rounded-full border px-2 py-1.5 text-[11px] font-medium transition-colors sm:px-3 sm:py-1 sm:text-xs " +
                 (mode === "606"
                   ? "border-sky-600 bg-sky-600 text-white"
                   : "border-black/10 text-neutral-600 hover:border-sky-300 dark:border-white/15 dark:text-neutral-300")
@@ -471,7 +471,7 @@ export function Chat({ quotaContext, accountName, onOpenAccount, onOpenAdmin }: 
               aria-pressed={mode === "607"}
               onClick={() => setMode((m) => (m === "607" ? null : "607"))}
               className={
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
+                "min-w-0 rounded-full border px-2 py-1.5 text-[11px] font-medium transition-colors sm:px-3 sm:py-1 sm:text-xs " +
                 (mode === "607"
                   ? "border-emerald-600 bg-emerald-600 text-white"
                   : "border-black/10 text-neutral-600 hover:border-emerald-300 dark:border-white/15 dark:text-neutral-300")
@@ -484,7 +484,7 @@ export function Chat({ quotaContext, accountName, onOpenAccount, onOpenAdmin }: 
               aria-pressed={mode === "IR17"}
               onClick={() => setMode((m) => (m === "IR17" ? null : "IR17"))}
               className={
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
+                "min-w-0 rounded-full border px-2 py-1.5 text-[11px] font-medium transition-colors sm:px-3 sm:py-1 sm:text-xs " +
                 (mode === "IR17"
                   ? "border-amber-600 bg-amber-600 text-white"
                   : "border-black/10 text-neutral-600 hover:border-amber-300 dark:border-white/15 dark:text-neutral-300")
@@ -493,7 +493,7 @@ export function Chat({ quotaContext, accountName, onOpenAccount, onOpenAdmin }: 
               🏦 Retención (IR-17)
             </button>
             {!mode && (
-              <span className="text-xs text-neutral-400 dark:text-neutral-500">
+              <span className="col-span-3 text-[11px] text-neutral-400 dark:text-neutral-500 sm:col-auto sm:text-xs">
                 (si no eliges, se asume Compra 606)
               </span>
             )}
@@ -566,7 +566,7 @@ export function Chat({ quotaContext, accountName, onOpenAccount, onOpenAdmin }: 
               onChange={(e) => setInput(e.target.value)}
               aria-label="Mensaje opcional"
               placeholder="Mensaje opcional — o solo adjunta las facturas y da Enviar"
-              className="min-w-0 rounded-full border border-black/10 bg-neutral-50 px-4 py-2.5 text-sm outline-none transition-colors focus:border-violet-400 focus:bg-white dark:border-white/15 dark:bg-neutral-800 dark:focus:bg-neutral-800 sm:flex-1"
+                className="min-w-0 rounded-full border border-black/10 bg-neutral-50 px-3 py-2.5 text-sm outline-none transition-colors focus:border-violet-400 focus:bg-white dark:border-white/15 dark:bg-neutral-800 dark:focus:bg-neutral-800 sm:flex-1 sm:px-4"
             />
             {isStreaming ? (
               <button
@@ -636,9 +636,9 @@ function WelcomeCard() {
     { icon: "📊", text: "El reporte .xlsx y .txt se genera listo para la DGII" },
   ];
   return (
-    <div className="mx-auto mb-6 max-w-md overflow-hidden rounded-2xl border border-black/5 bg-white shadow-md dark:border-white/10 dark:bg-neutral-900">
+    <div className="mx-auto mb-5 w-full max-w-md overflow-hidden rounded-2xl border border-black/5 bg-white shadow-md dark:border-white/10 dark:bg-neutral-900 sm:mb-6 sm:max-w-xl">
       {/* Animated hero */}
-      <div className="relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-violet-600 to-purple-800 px-6 pb-8 pt-10">
+      <div className="relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-violet-600 to-purple-800 px-5 pb-6 pt-7 sm:px-6 sm:pb-8 sm:pt-10">
         {/* Background orbs */}
         <div className="nala-orb-1 absolute -left-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
         <div className="nala-orb-2 absolute -bottom-6 -right-6 h-28 w-28 rounded-full bg-violet-300/20 blur-2xl" />
@@ -654,13 +654,13 @@ function WelcomeCard() {
         </p>
       </div>
       {/* Steps */}
-      <div className="p-5">
+      <div className="p-4 sm:p-5">
         <p className="mb-4 text-center text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
           Cómo funciona
         </p>
-        <ul className="space-y-3">
+        <ul className="space-y-3 sm:space-y-3.5">
           {steps.map((step, i) => (
-            <li key={i} className="flex items-center gap-3 text-sm text-neutral-700 dark:text-neutral-300">
+            <li key={i} className="flex items-start gap-3 text-sm leading-snug text-neutral-700 dark:text-neutral-300 sm:items-center">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-base dark:bg-violet-950/40">
                 {step.icon}
               </span>
