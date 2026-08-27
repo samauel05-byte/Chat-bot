@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 
 export function LoginForm() {
@@ -48,7 +49,10 @@ export function LoginForm() {
   return (
     <main className="grid min-h-dvh place-items-center bg-slate-950 p-5 text-white">
       <form onSubmit={submit} className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-7 shadow-2xl backdrop-blur">
-        <p className="mb-2 text-sm font-semibold tracking-[0.24em] text-violet-300">NALA</p>
+        <div className="mb-5 flex items-center gap-3">
+          <Image src="/logo.svg" alt="NALA" width={48} height={48} priority />
+          <p className="text-sm font-semibold tracking-[0.24em] text-violet-300">NALA</p>
+        </div>
         <h1 className="text-2xl font-semibold">{isNew ? "Crear cuenta" : "Accede a tu cuenta"}</h1>
         <p className="mt-2 text-sm text-slate-300">Tus reportes y licencia están protegidos.</p>
         {isNew && <label className="mt-6 block text-sm">Usuario
