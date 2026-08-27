@@ -30,7 +30,7 @@ export function LoginForm() {
     const result = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { username }, emailRedirectTo: window.location.origin },
+      options: { data: { username }, emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     setLoading(false);
     if (result.error) {
