@@ -10,8 +10,8 @@ export async function POST(request: Request) {
   if (owner?.role !== "owner") return Response.json({ error: "No autorizado" }, { status: 403 });
 
   const { username, email, companyId, fullName } = await request.json() as Record<string, string>;
-  if (!/^[a-zA-Z0-9_.-]{3,40}$/.test(username ?? "") || !email?.includes("@") || !companyId) {
-    return Response.json({ error: "Verifica usuario, correo y empresa." }, { status: 400 });
+  if (!/^[a-zA-Z0-9_.-]{3,40}$/.test(username ?? "") || !email?.includes("@") || !companyId || (fullName?.trim().length ?? 0) < 2) {
+    return Response.json({ error: "Verifica nombre, apellido, usuario, correo y empresa." }, { status: 400 });
   }
 
   const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
