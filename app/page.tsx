@@ -3,6 +3,7 @@ import { LicenseNotice } from "@/app/components/LicenseNotice";
 import { LoginForm } from "@/app/components/LoginForm";
 import { NalaWorkspace } from "@/app/components/NalaWorkspace";
 import { createClient } from "@/lib/supabase/server";
+import { createQuotaContext } from "@/lib/quota-context";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,10 @@ export default async function Home() {
   return (
     <>
       {hasExpiringLicense && <LicenseNotice expiresAt={expiresAt!} days={daysRemaining} />}
-      <NalaWorkspace isOwner={profile?.role === "owner"} />
+      <NalaWorkspace
+        isOwner={profile?.role === "owner"}
+        quotaContext={createQuotaContext(profile?.company_id ?? null)}
+      />
     </>
   );
 }

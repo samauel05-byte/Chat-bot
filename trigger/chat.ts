@@ -1,13 +1,15 @@
-import { chat } from "@trigger.dev/sdk/ai";
+import { ai, chat } from "@trigger.dev/sdk/ai";
 import { metadata } from "@trigger.dev/sdk";
 import { generateText, Output, streamText, stepCountIs, tool, type ModelMessage, type UserModelMessage, type TextPart } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { invoice606Schema } from "@/lib/dgii/schema606";
 import { invoice607Schema } from "@/lib/dgii/schema607";
 import { invoiceIR17Schema } from "@/lib/dgii/schemaIR17";
 import { generateReport } from "@/lib/dgii/generateReport";
+import { verifyQuotaContext, type QuotaContext } from "@/lib/quota-context";
 
 const MODEL = "gpt-5.6-terra";
 
@@ -28,6 +30,65 @@ type BatchProgress = {
 };
 
 const BATCH_TOOL_NAMES = ["generateReport606", "generateReport607", "generateReportIR17"];
+
+type QuotaResult = {
+  allowed: boolean;
+  monthly_limit: number | null;
+  used_before: number;
+  used_after: number;
+};
+
+function getCompanyIdFromChatContext(): string | null {
+  const context = ai.chatContext();
+  return verifyQuotaContext(context?.clientData as QuotaContext | undefined);
+}
+
+async function consumeInvoiceQuota(companyId: string | null, periodo: string, invoiceCount: number) {
+  // La cuenta propietaria no pertenece a una empresa cliente y no consume cupo.
+  if (!companyId) return;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !secretKey) {
+    throw new Error("No se pudo validar el límite de facturas. Comunícate con el administrador.");
+  }
+
+  const supabase = createClient(url, secretKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data, error } = await supabase.rpc("consume_company_invoice_quota", {
+    p_company_id: companyId,
+    p_periodo: periodo,
+    p_invoice_count: invoiceCount,
+  });
+  if (error) {
+    console.error("[invoice-chat] quota validation failed", error.message);
+    throw new Error("No se pudo validar el límite de facturas. Intenta nuevamente.");
+  }
+
+  const quota = (Array.isArray(data) ? data[0] : data) as QuotaResult | null;
+  if (!quota) {
+    throw new Error("No se pudo validar el límite de facturas. Intenta nuevamente.");
+  }
+  if (!quota.allowed) {
+    const limit = quota.monthly_limit?.toLocaleString("es-DO") ?? "0";
+    const used = quota.used_before.toLocaleString("es-DO");
+    throw new Error(
+      `Este lote tiene ${invoiceCount.toLocaleString("es-DO")} facturas y supera el límite mensual de ${limit}. ` +
+      `La empresa ya procesó ${used}. Comunícate con el administrador para ampliar tu plan.`
+    );
+  }
+}
+
+async function generateLimitedReport(
+  tipo: "606" | "607" | "IR17",
+  periodo: string,
+  rows: Record<string, unknown>[],
+  companyId = getCompanyIdFromChatContext()
+) {
+  await consumeInvoiceQuota(companyId, periodo, rows.length);
+  return generateReport(tipo, periodo, rows);
+}
 
 function getTextContent(message: ModelMessage): string {
   if (typeof message.content === "string") return message.content;
@@ -191,7 +252,7 @@ const tools = {
       if (cantidadEsperada !== undefined && facturas.length !== cantidadEsperada) {
         throw new Error(`Control de completitud: se esperaban ${cantidadEsperada} facturas y se extrajeron ${facturas.length}. No se generó un reporte parcial.`);
       }
-      const result = await generateReport("606", periodo, facturas as Record<string, unknown>[]);
+      const result = await generateLimitedReport("606", periodo, facturas as Record<string, unknown>[]);
       return {
         ...result,
         xlsxUrl: `/api/exports/${result.xlsxPathname.split("/").at(-1)}`,
@@ -212,7 +273,7 @@ const tools = {
       if (cantidadEsperada !== undefined && facturas.length !== cantidadEsperada) {
         throw new Error(`Control de completitud: se esperaban ${cantidadEsperada} facturas y se extrajeron ${facturas.length}. No se generó un reporte parcial.`);
       }
-      const result = await generateReport("607", periodo, facturas as Record<string, unknown>[]);
+      const result = await generateLimitedReport("607", periodo, facturas as Record<string, unknown>[]);
       return {
         ...result,
         xlsxUrl: `/api/exports/${result.xlsxPathname.split("/").at(-1)}`,
@@ -229,7 +290,7 @@ const tools = {
       retenciones: z.array(invoiceIR17Schema).min(1).describe("Array con TODAS las retenciones del documento"),
     }),
     execute: async ({ periodo, retenciones }) => {
-      const result = await generateReport("IR17", periodo, retenciones as Record<string, unknown>[]);
+      const result = await generateLimitedReport("IR17", periodo, retenciones as Record<string, unknown>[]);
       return {
         ...result,
         xlsxUrl: `/api/exports/${result.xlsxPathname.split("/").at(-1)}`,
@@ -420,6 +481,7 @@ function reportPeriod(instruction: string, rows: Record<string, unknown>[]): str
 
 export const invoiceChat = chat.agent({
   id: "invoice-chat",
+  clientDataSchema: z.object({ companyId: z.string().uuid().nullable(), signature: z.string().regex(/^[a-f0-9]{64}$/) }),
   tools,
   uiMessageStreamOptions: {
     onError: (error) => {
@@ -437,7 +499,7 @@ export const invoiceChat = chat.agent({
       return "Hubo un problema generando la respuesta. Intenta de nuevo.";
     },
   },
-  run: async ({ messages, tools: runTools, signal }) => {
+  run: async ({ messages, tools: runTools, signal, clientData }) => {
     const batch = getCurrentBatch(messages);
     if (batch) {
       const tipo = requestedType(batch.instruction);
@@ -473,7 +535,7 @@ export const invoiceChat = chat.agent({
           total: batch.files.length,
           recordsDetected: rows.length,
         });
-        const report = await generateReport(tipo, periodo, rows);
+        const report = await generateLimitedReport(tipo, periodo, rows, verifyQuotaContext(clientData));
         const xlsxUrl = `/api/exports/${report.xlsxPathname.split("/").at(-1)}`;
         const txtUrl = `/api/exports/${report.txtPathname.split("/").at(-1)}`;
 

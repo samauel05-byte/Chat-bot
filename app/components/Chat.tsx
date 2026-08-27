@@ -9,6 +9,8 @@ import { mintChatAccessToken, startChatSession } from "@/app/actions/chat";
 import { upload } from "@vercel/blob/client";
 import Markdown from "react-markdown";
 
+type QuotaContext = { companyId: string | null; signature: string };
+
 const TOOL_LABELS: Record<string, string> = {
   generateReport606: "📊 Generando reporte 606 (compras)…",
   generateReport607: "📊 Generando reporte 607 (ventas)…",
@@ -99,11 +101,12 @@ async function splitLongPdf(file: File): Promise<File[]> {
   }
 }
 
-export function Chat() {
+export function Chat({ quotaContext }: { quotaContext: QuotaContext }) {
   const transport = useTriggerChatTransport<typeof invoiceChat>({
     task: "invoice-chat",
+    clientData: quotaContext,
     accessToken: ({ chatId }) => mintChatAccessToken(chatId),
-    startSession: ({ chatId, clientData }) => startChatSession({ chatId, clientData }),
+    startSession: ({ chatId }) => startChatSession({ chatId }),
   });
 
   const { messages, sendMessage, stop, status, error } = useChat({ transport });

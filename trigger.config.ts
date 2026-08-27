@@ -8,9 +8,13 @@ export default defineConfig({
     extensions: [
       syncEnvVars(async () => {
         const openaiApiKey = process.env.OPENAI_API_KEY;
-        return openaiApiKey
-          ? [{ name: "OPENAI_API_KEY", value: openaiApiKey, isSecret: true }]
-          : [];
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+        return [
+          ...(openaiApiKey ? [{ name: "OPENAI_API_KEY", value: openaiApiKey, isSecret: true }] : []),
+          ...(supabaseUrl ? [{ name: "NEXT_PUBLIC_SUPABASE_URL", value: supabaseUrl, isSecret: false }] : []),
+          ...(supabaseSecretKey ? [{ name: "SUPABASE_SECRET_KEY", value: supabaseSecretKey, isSecret: true }] : []),
+        ];
       }),
     ],
   },
