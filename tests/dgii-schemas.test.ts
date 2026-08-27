@@ -6,7 +6,7 @@ import { z } from "zod";
 import { invoice606Schema } from "../lib/dgii/schema606";
 import { invoice607Schema } from "../lib/dgii/schema607";
 import { invoiceIR17Schema } from "../lib/dgii/schemaIR17";
-import { addExcelDropdown, calculatedInvoiceTotal, EXCEL_AMOUNT_FORMAT, has606Retention, invoiceRowColor, normalizeDgiiCode } from "../lib/dgii/generateReport";
+import { addExcelDropdown, calculatedInvoiceTotal, excelColumnsFor, EXCEL_AMOUNT_FORMAT, has606Retention, invoiceRowColor, normalizeDgiiCode } from "../lib/dgii/generateReport";
 import { FORMA_PAGO_606, TIPO_BIENES_SERVICIOS_606 } from "../lib/dgii/catalogs";
 
 const schemas = {
@@ -101,6 +101,11 @@ test("Excel: la sumatoria parte de los importes correctos", () => {
     2000
   );
   assert.equal(calculatedInvoiceTotal("607", { montoFacturado: 1675.5 }), 1675.5);
+});
+
+test("Excel: Tipo Id no aparece en la hoja visible", () => {
+  assert.equal(excelColumnsFor("606").some((column) => column.key === "tipoId"), false);
+  assert.equal(excelColumnsFor("607").some((column) => column.key === "tipoId"), false);
 });
 
 test("Excel 606: los menús desplegables comienzan en la primera factura", async () => {

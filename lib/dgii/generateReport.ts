@@ -18,6 +18,11 @@ const COLUMNS: Record<Tipo, { key: string; header: string }[]> = {
   "IR17": COLUMNS_IR17,
 };
 
+/** El Excel es de revisión; Tipo Id se conserva únicamente en el TXT oficial. */
+export function excelColumnsFor(tipo: Tipo): { key: string; header: string }[] {
+  return COLUMNS[tipo].filter((column) => column.key !== "tipoId");
+}
+
 export const EXCEL_AMOUNT_FORMAT = "#,##0.00";
 
 function columnLetter(columnNumber: number): string {
@@ -179,12 +184,13 @@ export async function generateReport(
     throw new Error("El período debe tener formato YYYYMM, ej. 202507");
   }
 
-  const columns = COLUMNS[tipo];
+  const officialColumns = COLUMNS[tipo];
+  const columns = excelColumnsFor(tipo);
   const normalizedRows = rows.map((row) => normalizeRetentionDates(tipo, row));
 
   function cellValue(row: Record<string, unknown>, header: string, blankZero = false): string {
     // Find the column key by header
-    const col = columns.find((c) => c.header === header);
+    const col = officialColumns.find((c) => c.header === header);
     if (!col) return "";
     const v = row[col.key as string];
     if (v === undefined || v === null || v === "") return "";
@@ -408,7 +414,7 @@ export async function generateReport(
 
   // TXT: excluir columnas auxiliares
   const skipKeys = new Set(["lineas", "estatus", "proveedor", "cliente", "nombre"]);
-  const txtColumns = columns.filter((c) => !skipKeys.has(c.key as string));
+  const txtColumns = officialColumns.filter((c) => !skipKeys.has(c.key as string));
   const txtLines = normalizedRows.map((row) =>
     txtColumns.map((c) => cellValue(row, c.header, true)).join("|")
   );
