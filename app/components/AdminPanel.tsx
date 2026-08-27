@@ -11,6 +11,10 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [name, setName] = useState("");
   const [rnc, setRnc] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [companyId, setCompanyId] = useState("");
   const [status, setStatus] = useState<string | null>(null);
 
   async function load() {
@@ -50,11 +54,19 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
     setStatus(error ? "No se pudo activar la cuenta." : "Cuenta activada para la empresa seleccionada.");
     await load();
   }
+  async function createUser(event: React.FormEvent) {
+    event.preventDefault();
+    const response = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, email, password, companyId }) });
+    const result = await response.json();
+    setStatus(response.ok ? "Usuario creado y asignado a la empresa." : result.error);
+    if (response.ok) { setUsername(""); setEmail(""); setPassword(""); await load(); }
+  }
 
   return <>
     {open && <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm"><section className="mx-auto max-w-2xl rounded-2xl bg-white p-6 text-slate-900 shadow-2xl">
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Clientes y licencias</h2><button onClick={onClose}>Cerrar</button></div>
       <form onSubmit={createCompany} className="mt-5 grid gap-2 sm:grid-cols-3"><input required value={name} onChange={e=>setName(e.target.value)} placeholder="Nombre de empresa" className="rounded border p-2"/><input value={rnc} onChange={e=>setRnc(e.target.value)} placeholder="RNC (opcional)" className="rounded border p-2"/><button className="rounded bg-violet-600 px-3 py-2 font-semibold text-white">Crear empresa</button></form>
+      <h3 className="mt-6 font-semibold">Crear usuario para una empresa</h3><form onSubmit={createUser} className="mt-2 grid gap-2 sm:grid-cols-2"><input required minLength={3} value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Correo" className="rounded border p-2"/><input required minLength={8} type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Contraseña inicial" className="rounded border p-2"/><select required value={companyId} onChange={e=>setCompanyId(e.target.value)} className="rounded border p-2"><option value="">Empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button className="rounded bg-slate-900 px-3 py-2 font-semibold text-white sm:col-span-2">Crear y activar usuario</button></form>
       {status && <p className="mt-3 text-sm text-violet-700">{status}</p>}
       <h3 className="mt-6 font-semibold">Cuentas pendientes</h3><div className="mt-2 space-y-2">{profiles.filter(p=>!p.company_id).map(p=><div key={p.id} className="flex flex-wrap gap-2 rounded border p-2 text-sm"><span className="flex-1">{p.full_name || "Cliente sin nombre"}</span><select defaultValue="" onChange={e=>e.target.value && void assign(p.id,e.target.value)} className="rounded border p-1"><option value="">Activar en empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>)}</div>
       <h3 className="mt-6 font-semibold">Empresas</h3><div className="mt-2 space-y-2">{companies.map(c=><div key={c.id} className="flex items-center gap-3 rounded border p-3 text-sm"><span className="flex-1"><b>{c.name}</b><br/>Vence: {new Intl.DateTimeFormat("es-DO", {dateStyle:"medium"}).format(new Date(c.license_expires_at))}</span><button onClick={()=>void renew(c.id)} className="rounded bg-emerald-600 px-3 py-2 font-semibold text-white">Marcar pagado · 30 días</button></div>)}</div>
