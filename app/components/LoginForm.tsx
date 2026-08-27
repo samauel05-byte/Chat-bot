@@ -27,7 +27,11 @@ export function LoginForm() {
       if (result.error) { setMessage("No fue posible acceder. Intenta de nuevo."); return; }
       router.replace("/"); router.refresh(); return;
     }
-    const result = await supabase.auth.signUp({ email, password, options: { data: { username } } });
+    const result = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { username }, emailRedirectTo: window.location.origin },
+    });
     setLoading(false);
     if (result.error) {
       setMessage("No fue posible acceder. Verifica el correo y la contraseña.");

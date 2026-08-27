@@ -6,8 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 type Company = { id: string; name: string; license_expires_at: string; license_status: string };
 type Profile = { id: string; full_name: string | null; company_id: string | null };
 
-export function AdminPanel() {
-  const [open, setOpen] = useState(false);
+export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [name, setName] = useState("");
@@ -53,9 +52,8 @@ export function AdminPanel() {
   }
 
   return <>
-    <button onClick={() => setOpen(true)} className="fixed bottom-4 right-4 z-40 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-lg">Administrar licencias</button>
     {open && <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm"><section className="mx-auto max-w-2xl rounded-2xl bg-white p-6 text-slate-900 shadow-2xl">
-      <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Clientes y licencias</h2><button onClick={() => setOpen(false)}>Cerrar</button></div>
+      <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Clientes y licencias</h2><button onClick={onClose}>Cerrar</button></div>
       <form onSubmit={createCompany} className="mt-5 grid gap-2 sm:grid-cols-3"><input required value={name} onChange={e=>setName(e.target.value)} placeholder="Nombre de empresa" className="rounded border p-2"/><input value={rnc} onChange={e=>setRnc(e.target.value)} placeholder="RNC (opcional)" className="rounded border p-2"/><button className="rounded bg-violet-600 px-3 py-2 font-semibold text-white">Crear empresa</button></form>
       {status && <p className="mt-3 text-sm text-violet-700">{status}</p>}
       <h3 className="mt-6 font-semibold">Cuentas pendientes</h3><div className="mt-2 space-y-2">{profiles.filter(p=>!p.company_id).map(p=><div key={p.id} className="flex flex-wrap gap-2 rounded border p-2 text-sm"><span className="flex-1">{p.full_name || "Cliente sin nombre"}</span><select defaultValue="" onChange={e=>e.target.value && void assign(p.id,e.target.value)} className="rounded border p-1"><option value="">Activar en empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>)}</div>
