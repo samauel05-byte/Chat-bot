@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 export function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isNew, setIsNew] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -17,9 +18,16 @@ export function LoginForm() {
     setLoading(true);
     setMessage(null);
     const supabase = createClient();
-    const result = isNew
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password });
+    if (!isNew) {
+      const response = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: email, password }) });
+      const session = await response.json();
+      if (!response.ok) { setLoading(false); setMessage("No fue posible acceder. Verifica el usuario/correo y la contraseña."); return; }
+      const result = await supabase.auth.setSession(session);
+      setLoading(false);
+      if (result.error) { setMessage("No fue posible acceder. Intenta de nuevo."); return; }
+      router.replace("/"); router.refresh(); return;
+    }
+    const result = await supabase.auth.signUp({ email, password, options: { data: { username } } });
     setLoading(false);
     if (result.error) {
       setMessage("No fue posible acceder. Verifica el correo y la contraseña.");
@@ -39,7 +47,10 @@ export function LoginForm() {
         <p className="mb-2 text-sm font-semibold tracking-[0.24em] text-violet-300">NALA</p>
         <h1 className="text-2xl font-semibold">{isNew ? "Crear cuenta" : "Accede a tu cuenta"}</h1>
         <p className="mt-2 text-sm text-slate-300">Tus reportes y licencia están protegidos.</p>
-        <label className="mt-6 block text-sm">Correo electrónico
+        {isNew && <label className="mt-6 block text-sm">Usuario
+          <input required minLength={3} value={username} onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))} className="mt-1 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-3 outline-none focus:border-violet-400" />
+        </label>}
+        <label className="mt-6 block text-sm">{isNew ? "Correo electrónico" : "Usuario o correo"}
           <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-3 outline-none focus:border-violet-400" />
         </label>
         <label className="mt-4 block text-sm">Contraseña
