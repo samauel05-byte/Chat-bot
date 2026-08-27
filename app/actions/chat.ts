@@ -15,10 +15,11 @@ async function getCurrentCompanyId() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("company_id")
+    .select("company_id, role")
     .eq("id", user.id)
     .maybeSingle();
 
+  if (!profile) throw new Error("Esta cuenta ya no está activa. Comunícate con el administrador.");
   return profile?.company_id ?? null;
 }
 
