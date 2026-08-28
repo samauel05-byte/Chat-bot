@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-export function AccountPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AccountPanel({ open, onClose, required = false, onChanged }: { open: boolean; onClose: () => void; required?: boolean; onChanged?: () => void }) {
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -30,13 +30,14 @@ export function AccountPanel({ open, onClose }: { open: boolean; onClose: () => 
     setPassword("");
     setConfirmation("");
     setMessage("Tu contraseña fue actualizada correctamente.");
+    onChanged?.();
   }
 
   if (!open) return null;
   return <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm">
     <form onSubmit={changePassword} className="w-full max-w-md rounded-2xl bg-white p-6 text-slate-900 shadow-2xl">
-      <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-bold">Cambiar contraseña</h2><button type="button" onClick={onClose} className="text-sm underline">Cerrar</button></div>
-      <p className="mt-2 text-sm text-slate-600">Elige una contraseña nueva de al menos 8 caracteres.</p>
+      <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-bold">{required ? "Actualiza tu contraseña" : "Cambiar contraseña"}</h2>{!required && <button type="button" onClick={onClose} className="text-sm underline">Cerrar</button>}</div>
+      <p className="mt-2 text-sm text-slate-600">{required ? "Por seguridad debes crear una contraseña nueva para continuar." : "Elige una contraseña nueva de al menos 8 caracteres."}</p>
       <label className="mt-5 block text-sm font-medium">Contraseña nueva<input required minLength={8} type="password" value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border p-3" /></label>
       <label className="mt-4 block text-sm font-medium">Confirmar contraseña<input required minLength={8} type="password" value={confirmation} onChange={e => setConfirmation(e.target.value)} className="mt-1 w-full rounded-lg border p-3" /></label>
       {message && <p className={"mt-4 rounded-lg p-3 text-sm " + (isError ? "bg-rose-50 text-rose-800" : "bg-violet-50 text-violet-800")}>{message}</p>}

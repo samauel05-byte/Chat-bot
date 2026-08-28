@@ -24,7 +24,7 @@ export default async function Home() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, company_id, username, full_name, companies(name, license_expires_at, license_status)")
+    .select("role, company_id, username, full_name, must_change_password, companies(name, license_expires_at, license_status)")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -53,6 +53,7 @@ export default async function Home() {
         isOwner={profile?.role === "owner"}
         quotaContext={createQuotaContext(profile?.company_id ?? null)}
         accountName={profile?.full_name || profile?.username || user.email || "Mi cuenta"}
+        mustChangePassword={profile?.role !== "owner" && Boolean(profile?.must_change_password)}
       />
     </>
   );

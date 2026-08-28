@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     data: { username: username.trim().toLowerCase(), full_name: fullName?.trim() ?? "" },
   });
   if (error || !data.user) return Response.json({ error: "No se pudo enviar la invitación. El usuario o correo quizá ya existe." }, { status: 400 });
-  const { error: profileError } = await admin.from("profiles").update({ company_id: companyId }).eq("id", data.user.id);
+  const { error: profileError } = await admin.from("profiles").update({ company_id: companyId, must_change_password: true }).eq("id", data.user.id);
   if (profileError) return Response.json({ error: "La invitación fue enviada, pero no pudo asignarse a la empresa." }, { status: 500 });
   return Response.json({ ok: true });
 }

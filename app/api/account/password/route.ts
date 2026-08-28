@@ -34,5 +34,11 @@ export async function POST(request: Request) {
     return Response.json({ error: "No se pudo guardar la contraseña. Intenta nuevamente." }, { status: 400 });
   }
 
+  const { error: profileError } = await admin.from("profiles").update({ must_change_password: false }).eq("id", user.id);
+  if (profileError) {
+    console.error("[account/password] unable to clear password requirement", { userId: user.id, message: profileError.message });
+    return Response.json({ error: "La clave fue guardada, pero no se pudo terminar la actualización. Intenta entrar nuevamente." }, { status: 500 });
+  }
+
   return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }

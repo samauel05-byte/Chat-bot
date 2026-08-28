@@ -90,7 +90,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
   const { error: profileError } = await access.admin
     .from("profiles")
-    .update({ username, full_name: fullName || null, company_id: companyId })
+    .update({ username, full_name: fullName || null, company_id: companyId, ...(password ? { must_change_password: true } : {}) })
     .eq("id", userId);
   if (profileError) return Response.json({ error: "La cuenta se actualizó, pero no se pudo guardar su perfil." }, { status: 500 });
 

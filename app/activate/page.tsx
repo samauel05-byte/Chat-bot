@@ -29,9 +29,10 @@ export default function ActivateAccountPage() {
     if (password !== confirmPassword) { setMessage("Las contraseñas no coinciden."); return; }
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password });
+    const { data: { session } } = await supabase.auth.getSession();
+    const response = await fetch("/api/account/password", { method: "POST", headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) }, body: JSON.stringify({ password }) });
     setLoading(false);
-    if (error) { setMessage("No se pudo crear la contraseña. Solicita una nueva invitación."); return; }
+    if (!response.ok) { setMessage("No se pudo crear la contraseña. Solicita una nueva invitación."); return; }
     router.replace("/");
     router.refresh();
   }
