@@ -30,12 +30,19 @@ type BatchProgress = {
 };
 
 const BATCH_TOOL_NAMES = ["generateReport606", "generateReport607", "generateReportIR17"];
+const MAX_RECORDS_PER_BATCH = 33;
+const TRIAL_LICENSE_MESSAGE = "Esta cuenta tiene límites del administrador. Contacta a Samuel Roa para que te libere la licencia.";
 
 type QuotaResult = {
   allowed: boolean;
   monthly_limit: number | null;
   used_before: number;
   used_after: number;
+};
+
+type TrialQuota = {
+  isTrial: boolean;
+  remaining: number | null;
 };
 
 function getCompanyIdFromChatContext(): string | null {
@@ -71,12 +78,53 @@ async function consumeInvoiceQuota(companyId: string | null, periodo: string, in
     throw new Error("No se pudo validar el límite de facturas. Intenta nuevamente.");
   }
   if (!quota.allowed) {
+    const trialQuota = await getTrialQuota(companyId);
+    if (trialQuota.isTrial) throw new Error(TRIAL_LICENSE_MESSAGE);
     const limit = quota.monthly_limit?.toLocaleString("es-DO") ?? "0";
     const used = quota.used_before.toLocaleString("es-DO");
     throw new Error(
       `Este lote tiene ${invoiceCount.toLocaleString("es-DO")} facturas y supera el límite configurado de ${limit}. ` +
       `La empresa ya procesó ${used}. Comunícate con el administrador para ampliar tu plan.`
     );
+  }
+}
+
+async function getTrialQuota(companyId: string | null): Promise<TrialQuota> {
+  if (!companyId) return { isTrial: false, remaining: null };
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !secretKey) {
+    throw new Error("No se pudo validar el límite de facturas. Comunícate con el administrador.");
+  }
+
+  const supabase = createClient(url, secretKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: company, error: companyError } = await supabase
+    .from("companies")
+    .select("is_trial, trial_invoice_limit")
+    .eq("id", companyId)
+    .maybeSingle();
+  const trialCompany = company as { is_trial: boolean; trial_invoice_limit: number | null } | null;
+  if (companyError || !trialCompany?.is_trial) return { isTrial: false, remaining: null };
+
+  const { data: usage, error: usageError } = await supabase
+    .from("invoice_usage_monthly")
+    .select("invoice_count")
+    .eq("company_id", companyId);
+  if (usageError) throw new Error("No se pudo validar el límite de facturas. Intenta nuevamente.");
+
+  const usageRows = (usage ?? []) as { invoice_count: number | null }[];
+  const used = usageRows.reduce((total, item) => total + (item.invoice_count ?? 0), 0);
+  return { isTrial: true, remaining: Math.max(0, (trialCompany.trial_invoice_limit ?? 5) - used) };
+}
+
+async function ensureReportCanBeGenerated(companyId: string | null, recordCount: number) {
+  if (recordCount > MAX_RECORDS_PER_BATCH) {
+    throw new Error(`El archivo contiene más de ${MAX_RECORDS_PER_BATCH} facturas o retenciones. No se generó ningún Excel ni TXT.`);
+  }
+  const trialQuota = await getTrialQuota(companyId);
+  if (trialQuota.isTrial && (trialQuota.remaining ?? 0) < recordCount) {
+    throw new Error(TRIAL_LICENSE_MESSAGE);
   }
 }
 
@@ -89,6 +137,7 @@ async function generateLimitedReport(
   // El cobro y el límite se registran únicamente después de que ambos archivos
   // fueron creados. Así se factura exactamente la cantidad que aparece en el
   // Excel/TXT final, nunca PDFs subidos ni una exportación fallida.
+  await ensureReportCanBeGenerated(companyId, rows.length);
   const report = await generateReport(tipo, periodo, rows);
   await consumeInvoiceQuota(companyId, periodo, report.recordCount);
   return report;
@@ -112,7 +161,7 @@ function getCurrentBatch(messages: ModelMessage[]): BatchRequest | null {
 
   try {
     const files = JSON.parse(markerMatch[1]) as FileMeta[];
-    if (!Array.isArray(files) || files.length < 2) return null;
+    if (!Array.isArray(files) || files.length < 1) return null;
     return {
       files,
       instruction: rawText.replace(/\s*\[FACTURAS:[\s\S]*?\]$/, "").trim(),
@@ -463,6 +512,9 @@ async function extractLargeBatch(
       batch.files.length
     );
     rows.push(...extracted);
+    if (rows.length > MAX_RECORDS_PER_BATCH) {
+      throw new Error(`El archivo contiene más de ${MAX_RECORDS_PER_BATCH} facturas o retenciones. No se generó ningún Excel ni TXT.`);
+    }
   }
   return rows;
 }
@@ -496,7 +548,9 @@ export const invoiceChat = chat.agent({
         message.includes("No se pudo leer la parte") ||
         message.includes("No se encontraron facturas") ||
         message.includes("No se pudo determinar el período") ||
-        message.includes("El período debe tener formato")
+        message.includes("El período debe tener formato") ||
+        message.includes("más de 33 facturas") ||
+        message.includes(TRIAL_LICENSE_MESSAGE)
       ) {
         return `No se generó ningún archivo: ${message}`;
       }
@@ -508,9 +562,16 @@ export const invoiceChat = chat.agent({
     if (batch) {
       const tipo = requestedType(batch.instruction);
       try {
+        const expected = expectedCount(batch.instruction);
+        if (expected !== undefined && expected > MAX_RECORDS_PER_BATCH) {
+          throw new Error(`El archivo contiene más de ${MAX_RECORDS_PER_BATCH} facturas o retenciones. No se generó ningún Excel ni TXT.`);
+        }
+        const trialQuota = await getTrialQuota(verifyQuotaContext(clientData));
+        if (trialQuota.isTrial && (trialQuota.remaining ?? 0) === 0) {
+          throw new Error(TRIAL_LICENSE_MESSAGE);
+        }
         publishBatchProgress({ status: "preparando", current: 0, total: batch.files.length });
         const rows = await extractLargeBatch(batch, tipo);
-        const expected = expectedCount(batch.instruction);
 
         publishBatchProgress({
           status: "validando",
