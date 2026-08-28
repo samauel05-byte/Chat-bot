@@ -24,7 +24,7 @@ export default async function Home() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role, company_id, username, full_name, must_change_password, companies(name, license_expires_at, license_status)")
+    .select("role, company_id, username, full_name, must_change_password, companies(name, license_expires_at, license_status, is_trial)")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -37,12 +37,12 @@ export default async function Home() {
   const currentTime = new Date().getTime();
   const millisecondsRemaining = expiresAt ? new Date(expiresAt).getTime() - currentTime : null;
   const isExpired = Boolean(
-    company && (company.license_status !== "active" || (millisecondsRemaining ?? 0) <= 0)
+    company && (company.license_status !== "active" || (!company.is_trial && (millisecondsRemaining ?? 0) <= 0))
   );
   if (isExpired) return <LicenseBlock expiresAt={expiresAt} />;
 
   const hasExpiringLicense = Boolean(
-    millisecondsRemaining !== null && millisecondsRemaining <= 5 * 86_400_000
+    !company?.is_trial && millisecondsRemaining !== null && millisecondsRemaining <= 5 * 86_400_000
   );
   const daysRemaining = millisecondsRemaining === null ? 0 : Math.max(0, Math.ceil(millisecondsRemaining / 86_400_000));
 

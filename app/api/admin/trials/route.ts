@@ -18,10 +18,7 @@ export async function POST(request: Request) {
   const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const fullName = typeof body.fullName === "string" ? body.fullName.trim() : "";
-  const trialDays = typeof body.trialDays === "number" ? body.trialDays : Number(body.trialDays);
-  const invoiceLimit = typeof body.invoiceLimit === "number" ? body.invoiceLimit : Number(body.invoiceLimit);
-
-  if (companyName.length < 2 || fullName.length < 2 || !isValidUsername(username) || !email.includes("@") || !Number.isInteger(trialDays) || trialDays < 1 || trialDays > 30 || !Number.isInteger(invoiceLimit) || invoiceLimit < 1) {
+  if (companyName.length < 2 || fullName.length < 2 || !isValidUsername(username) || !email.includes("@")) {
     return Response.json({ error: "Verifica los datos de la cuenta de prueba." }, { status: 400 });
   }
 
@@ -29,10 +26,12 @@ export async function POST(request: Request) {
   const { data: duplicate } = await admin.from("profiles").select("id").ilike("username", username).maybeSingle();
   if (duplicate) return Response.json({ error: "Ese usuario ya está en uso." }, { status: 400 });
 
-  const licenseExpiresAt = new Date(Date.now() + trialDays * 86_400_000).toISOString();
+  // La prueba no vence por fecha: se bloquea de forma permanente al completar
+  // cinco facturas exportadas, hasta que el administrador la convierta a plan normal.
+  const licenseExpiresAt = new Date(Date.now() + 20 * 365 * 86_400_000).toISOString();
   const { data: company, error: companyError } = await admin
     .from("companies")
-    .insert({ name: `Prueba · ${companyName}`, license_status: "active", license_expires_at: licenseExpiresAt, monthly_invoice_limit: invoiceLimit })
+    .insert({ name: `Prueba · ${companyName}`, license_status: "active", license_expires_at: licenseExpiresAt, is_trial: true, trial_invoice_limit: 5, monthly_invoice_limit: null })
     .select("id")
     .single();
   if (companyError || !company) return Response.json({ error: "No se pudo preparar la cuenta de prueba." }, { status: 500 });
@@ -54,5 +53,5 @@ export async function POST(request: Request) {
     return Response.json({ error: "No se pudo activar la cuenta de prueba." }, { status: 500 });
   }
 
-  return Response.json({ ok: true, expiresAt: licenseExpiresAt });
+  return Response.json({ ok: true });
 }

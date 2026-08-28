@@ -74,7 +74,7 @@ async function consumeInvoiceQuota(companyId: string | null, periodo: string, in
     const limit = quota.monthly_limit?.toLocaleString("es-DO") ?? "0";
     const used = quota.used_before.toLocaleString("es-DO");
     throw new Error(
-      `Este lote tiene ${invoiceCount.toLocaleString("es-DO")} facturas y supera el límite mensual de ${limit}. ` +
+      `Este lote tiene ${invoiceCount.toLocaleString("es-DO")} facturas y supera el límite configurado de ${limit}. ` +
       `La empresa ya procesó ${used}. Comunícate con el administrador para ampliar tu plan.`
     );
   }
