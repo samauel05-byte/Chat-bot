@@ -27,6 +27,13 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
   const [editPassword, setEditPassword] = useState("");
+  const [trialCompanyName, setTrialCompanyName] = useState("");
+  const [trialUsername, setTrialUsername] = useState("");
+  const [trialFirstName, setTrialFirstName] = useState("");
+  const [trialLastName, setTrialLastName] = useState("");
+  const [trialEmail, setTrialEmail] = useState("");
+  const [trialDays, setTrialDays] = useState("7");
+  const [trialInvoiceLimit, setTrialInvoiceLimit] = useState("15");
 
   async function load() {
     const supabase = createClient();
@@ -113,6 +120,24 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
     setStatus(response.ok ? "Invitación enviada y usuario asignado a la empresa." : result.error);
     if (response.ok) { setUsername(""); setFirstName(""); setLastName(""); setEmail(""); await load(); }
   }
+  async function createTrial(event: React.FormEvent) {
+    event.preventDefault();
+    const response = await fetch("/api/admin/trials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyName: trialCompanyName,
+        username: trialUsername.replace(/\s/g, ""),
+        email: trialEmail,
+        fullName: `${trialFirstName.trim()} ${trialLastName.trim()}`.trim(),
+        trialDays: Number(trialDays),
+        invoiceLimit: Number(trialInvoiceLimit),
+      }),
+    });
+    const result = await response.json();
+    setStatus(response.ok ? `Prueba enviada. Vence el ${new Intl.DateTimeFormat("es-DO", { dateStyle: "medium" }).format(new Date(result.expiresAt))}.` : result.error ?? "No se pudo enviar la prueba.");
+    if (response.ok) { setTrialCompanyName(""); setTrialUsername(""); setTrialFirstName(""); setTrialLastName(""); setTrialEmail(""); setTrialDays("7"); setTrialInvoiceLimit("15"); await load(); }
+  }
   function openEditUser(profile: Profile) {
     const [firstName = "", ...lastName] = (profile.full_name ?? "").trim().split(/\s+/).filter(Boolean);
     setEditingUser(profile); setEditUsername(profile.username ?? ""); setEditFirstName(firstName); setEditLastName(lastName.join(" ")); setEditPassword("");
@@ -152,6 +177,7 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Clientes y licencias</h2><button onClick={onClose}>Cerrar</button></div>
       <form onSubmit={createCompany} className="mt-5 grid gap-2 sm:grid-cols-4"><input required value={name} onChange={e=>setName(e.target.value)} placeholder="Nombre de empresa" className="rounded border p-2"/><input value={rnc} onChange={e=>setRnc(e.target.value)} placeholder="RNC (opcional)" className="rounded border p-2"/><label className="relative"><input min="1" type="number" value={monthlyLimit} onChange={e=>setMonthlyLimit(e.target.value)} placeholder="Límite mensual" className="w-full rounded border p-2"/><span className="mt-1 block text-xs text-slate-500">Costo estimado: {usd.format((Number(monthlyLimit) || 0) * COST_PER_INVOICE_USD)}</span></label><button className="rounded bg-violet-600 px-3 py-2 font-semibold text-white">Crear empresa</button></form>
       <h3 className="mt-6 font-semibold">Crear usuario para una empresa</h3><p className="mt-1 text-sm text-slate-600">La persona recibirá un correo para activar su cuenta y crear su contraseña.</p><form onSubmit={createUser} className="mt-2 grid gap-2 sm:grid-cols-2"><input required minLength={3} value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Nombre" className="rounded border p-2"/><input required value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Apellido" className="rounded border p-2"/><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Correo" className="rounded border p-2"/><select required value={companyId} onChange={e=>setCompanyId(e.target.value)} className="rounded border p-2 sm:col-span-2"><option value="">Empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button className="rounded bg-slate-900 px-3 py-2 font-semibold text-white sm:col-span-2">Enviar invitación y activar usuario</button></form>
+      <h3 className="mt-6 font-semibold">Enviar prueba del sistema</h3><p className="mt-1 text-sm text-slate-600">Crea una cuenta temporal y envía al cliente un correo para activar su acceso. Al vencer los días o alcanzar el límite, el acceso se bloquea automáticamente.</p><form onSubmit={createTrial} className="mt-2 grid gap-2 sm:grid-cols-2"><input required minLength={2} value={trialCompanyName} onChange={e=>setTrialCompanyName(e.target.value)} placeholder="Empresa del cliente" className="rounded border p-2"/><input required minLength={3} value={trialUsername} onChange={e=>setTrialUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required value={trialFirstName} onChange={e=>setTrialFirstName(e.target.value)} placeholder="Nombre" className="rounded border p-2"/><input required value={trialLastName} onChange={e=>setTrialLastName(e.target.value)} placeholder="Apellido" className="rounded border p-2"/><input required type="email" value={trialEmail} onChange={e=>setTrialEmail(e.target.value)} placeholder="Correo" className="rounded border p-2 sm:col-span-2"/><label className="text-sm font-medium">Días de prueba<input required min="1" max="30" type="number" value={trialDays} onChange={e=>setTrialDays(e.target.value)} className="mt-1 w-full rounded border p-2"/></label><label className="text-sm font-medium">Máximo de facturas<input required min="1" type="number" value={trialInvoiceLimit} onChange={e=>setTrialInvoiceLimit(e.target.value)} className="mt-1 w-full rounded border p-2"/></label><button className="rounded bg-emerald-600 px-3 py-2 font-semibold text-white sm:col-span-2">Enviar cuenta de prueba</button></form>
       {editingUser && <form onSubmit={saveUser} className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4"><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Editar usuario</h3><button type="button" onClick={()=>setEditingUser(null)} className="text-sm underline">Cancelar</button></div><p className="mt-1 text-sm text-slate-600">Actualiza el nombre, apellido o usuario. Si asignas una clave, el usuario tendrá que cambiarla obligatoriamente al entrar.</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><input required minLength={3} value={editUsername} onChange={e=>setEditUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required value={editFirstName} onChange={e=>setEditFirstName(e.target.value)} placeholder="Nombre" className="rounded border p-2"/><input required value={editLastName} onChange={e=>setEditLastName(e.target.value)} placeholder="Apellido" className="rounded border p-2"/><input minLength={8} type="password" value={editPassword} onChange={e=>setEditPassword(e.target.value)} placeholder="Nueva contraseña (opcional)" className="rounded border p-2"/></div><button className="mt-3 rounded bg-sky-600 px-3 py-2 font-semibold text-white">Guardar cambios</button></form>}
       {status && <p className="mt-3 text-sm text-violet-700">{status}</p>}
       <h3 className="mt-6 font-semibold">Súper administrador</h3><div className="mt-2 space-y-2">{profiles.filter(p=>p.role === "owner").map(p=><div key={p.id} className="flex flex-wrap items-center gap-2 rounded border border-violet-200 bg-violet-50 p-3 text-sm"><span className="min-w-40 flex-1"><b>{p.username || "Sin usuario"}</b>{p.full_name && <span> · {p.full_name}</span>}<br/><span className="font-medium text-violet-700">Acceso total al sistema</span></span><span className="rounded-full bg-violet-600 px-3 py-1 font-semibold text-white">Súper administrador</span></div>)}</div>
