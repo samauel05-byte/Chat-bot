@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 type Company = { id: string; name: string; license_expires_at: string; license_status: string; monthly_invoice_limit: number | null };
 type Profile = { id: string; full_name: string | null; username: string | null; company_id: string | null; companies?: { name: string } | { name: string }[] | null };
 type Usage = { company_id: string; periodo: string; invoice_count: number };
-const COST_PER_INVOICE_USD = 0.50;
+const COST_PER_INVOICE_USD = 0.15;
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
