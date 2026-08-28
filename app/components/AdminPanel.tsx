@@ -22,6 +22,11 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
   const [companyId, setCompanyId] = useState("");
   const [monthlyLimit, setMonthlyLimit] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [editUsername, setEditUsername] = useState("");
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [editPassword, setEditPassword] = useState("");
 
   async function load() {
     const supabase = createClient();
@@ -108,21 +113,21 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
     setStatus(response.ok ? "Invitación enviada y usuario asignado a la empresa." : result.error);
     if (response.ok) { setUsername(""); setFirstName(""); setLastName(""); setEmail(""); await load(); }
   }
-  async function editUser(profile: Profile) {
-    const nextUsername = window.prompt("Usuario", profile.username ?? "")?.trim().replace(/\s/g, "").toLowerCase();
-    if (!nextUsername) return;
-    const nextName = window.prompt("Nombre (opcional)", profile.full_name ?? "");
-    if (nextName === null) return;
-    const nextPassword = window.prompt("Nueva contraseña (déjala vacía para conservar la actual)", "");
-    if (nextPassword === null) return;
-    const response = await fetch(`/api/admin/users/${profile.id}`, {
+  function openEditUser(profile: Profile) {
+    const [firstName = "", ...lastName] = (profile.full_name ?? "").trim().split(/\s+/).filter(Boolean);
+    setEditingUser(profile); setEditUsername(profile.username ?? ""); setEditFirstName(firstName); setEditLastName(lastName.join(" ")); setEditPassword("");
+  }
+  async function saveUser(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingUser) return;
+    const response = await fetch(`/api/admin/users/${editingUser.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: nextUsername, fullName: nextName, password: nextPassword, companyId: profile.company_id }),
+      body: JSON.stringify({ username: editUsername.trim().replace(/\s/g, "").toLowerCase(), fullName: `${editFirstName.trim()} ${editLastName.trim()}`.trim(), password: editPassword, companyId: editingUser.company_id }),
     });
     const result = await response.json();
     setStatus(response.ok ? "Usuario actualizado." : result.error ?? "No se pudo actualizar el usuario.");
-    if (response.ok) await load();
+    if (response.ok) { setEditingUser(null); await load(); }
   }
   async function moveUser(profile: Profile, nextCompanyId: string) {
     const response = await fetch(`/api/admin/users/${profile.id}`, {
@@ -147,9 +152,10 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
       <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Clientes y licencias</h2><button onClick={onClose}>Cerrar</button></div>
       <form onSubmit={createCompany} className="mt-5 grid gap-2 sm:grid-cols-4"><input required value={name} onChange={e=>setName(e.target.value)} placeholder="Nombre de empresa" className="rounded border p-2"/><input value={rnc} onChange={e=>setRnc(e.target.value)} placeholder="RNC (opcional)" className="rounded border p-2"/><label className="relative"><input min="1" type="number" value={monthlyLimit} onChange={e=>setMonthlyLimit(e.target.value)} placeholder="Límite mensual" className="w-full rounded border p-2"/><span className="mt-1 block text-xs text-slate-500">Costo estimado: {usd.format((Number(monthlyLimit) || 0) * COST_PER_INVOICE_USD)}</span></label><button className="rounded bg-violet-600 px-3 py-2 font-semibold text-white">Crear empresa</button></form>
       <h3 className="mt-6 font-semibold">Crear usuario para una empresa</h3><p className="mt-1 text-sm text-slate-600">La persona recibirá un correo para activar su cuenta y crear su contraseña.</p><form onSubmit={createUser} className="mt-2 grid gap-2 sm:grid-cols-2"><input required minLength={3} value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Nombre" className="rounded border p-2"/><input required value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Apellido" className="rounded border p-2"/><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Correo" className="rounded border p-2"/><select required value={companyId} onChange={e=>setCompanyId(e.target.value)} className="rounded border p-2 sm:col-span-2"><option value="">Empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button className="rounded bg-slate-900 px-3 py-2 font-semibold text-white sm:col-span-2">Enviar invitación y activar usuario</button></form>
+      {editingUser && <form onSubmit={saveUser} className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4"><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Editar usuario</h3><button type="button" onClick={()=>setEditingUser(null)} className="text-sm underline">Cancelar</button></div><p className="mt-1 text-sm text-slate-600">Actualiza el nombre, apellido o usuario. La contraseña es opcional.</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><input required minLength={3} value={editUsername} onChange={e=>setEditUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required value={editFirstName} onChange={e=>setEditFirstName(e.target.value)} placeholder="Nombre" className="rounded border p-2"/><input required value={editLastName} onChange={e=>setEditLastName(e.target.value)} placeholder="Apellido" className="rounded border p-2"/><input minLength={8} type="password" value={editPassword} onChange={e=>setEditPassword(e.target.value)} placeholder="Nueva contraseña (opcional)" className="rounded border p-2"/></div><button className="mt-3 rounded bg-sky-600 px-3 py-2 font-semibold text-white">Guardar cambios</button></form>}
       {status && <p className="mt-3 text-sm text-violet-700">{status}</p>}
       <h3 className="mt-6 font-semibold">Cuentas pendientes</h3><div className="mt-2 space-y-2">{profiles.filter(p=>!p.company_id).map(p=><div key={p.id} className="flex flex-wrap gap-2 rounded border p-2 text-sm"><span className="flex-1">{p.full_name || "Cliente sin nombre"}</span><select defaultValue="" onChange={e=>e.target.value && void assign(p.id,e.target.value)} className="rounded border p-1"><option value="">Activar en empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>)}</div>
-      <h3 className="mt-6 font-semibold">Usuarios creados</h3><div className="mt-2 space-y-2">{profiles.filter(p=>p.company_id).map(p=>{const company = Array.isArray(p.companies) ? p.companies[0] : p.companies; return <div key={p.id} className="flex flex-wrap items-center gap-2 rounded border p-3 text-sm"><span className="min-w-40 flex-1"><b>{p.username || "Sin usuario"}</b>{p.full_name && <span> · {p.full_name}</span>}<br/><span className="text-slate-600">Empresa: {company?.name || "Sin empresa"}</span></span><select value={p.company_id ?? ""} onChange={e=>e.target.value && void moveUser(p, e.target.value)} className="rounded border p-2"><option value="">Empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button onClick={()=>void editUser(p)} className="rounded bg-sky-600 px-3 py-2 font-semibold text-white">Editar</button><button onClick={()=>void deleteUser(p)} className="rounded bg-rose-600 px-3 py-2 font-semibold text-white">Eliminar</button></div>})}{profiles.filter(p=>p.company_id).length === 0 && <p className="text-sm text-slate-500">Aún no hay usuarios asignados a una empresa.</p>}</div>
+      <h3 className="mt-6 font-semibold">Usuarios creados</h3><div className="mt-2 space-y-2">{profiles.filter(p=>p.company_id).map(p=>{const company = Array.isArray(p.companies) ? p.companies[0] : p.companies; return <div key={p.id} className="flex flex-wrap items-center gap-2 rounded border p-3 text-sm"><span className="min-w-40 flex-1"><b>{p.username || "Sin usuario"}</b>{p.full_name && <span> · {p.full_name}</span>}<br/><span className="text-slate-600">Empresa: {company?.name || "Sin empresa"}</span></span><select value={p.company_id ?? ""} onChange={e=>e.target.value && void moveUser(p, e.target.value)} className="rounded border p-2"><option value="">Empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button onClick={()=>openEditUser(p)} className="rounded bg-sky-600 px-3 py-2 font-semibold text-white">Editar</button><button onClick={()=>void deleteUser(p)} className="rounded bg-rose-600 px-3 py-2 font-semibold text-white">Eliminar</button></div>})}{profiles.filter(p=>p.company_id).length === 0 && <p className="text-sm text-slate-500">Aún no hay usuarios asignados a una empresa.</p>}</div>
       <h3 className="mt-6 font-semibold">Empresas</h3><div className="mt-2 space-y-2">{companies.map(c=>{const used = usage.find(u=>u.company_id === c.id)?.invoice_count ?? 0; const limitText = c.monthly_invoice_limit === null ? "Sin límite" : `${used.toLocaleString("es-DO")} / ${c.monthly_invoice_limit.toLocaleString("es-DO")} facturas exportadas este mes`; const projectedCost = c.monthly_invoice_limit === null ? null : c.monthly_invoice_limit * COST_PER_INVOICE_USD; return <div key={c.id} className="flex flex-wrap items-center gap-2 rounded border p-3 text-sm"><span className="min-w-40 flex-1"><b>{c.name}</b><br/>Vence: {new Intl.DateTimeFormat("es-DO", {dateStyle:"medium"}).format(new Date(c.license_expires_at))}<br/><span className="text-slate-600">Límite: {limitText}</span><br/><span className="font-medium text-emerald-700">Facturado por exportación: {usd.format(used * COST_PER_INVOICE_USD)} ({used.toLocaleString("es-DO")} facturas)</span>{projectedCost !== null && <span className="text-slate-600"> · al límite: {usd.format(projectedCost)}</span>}</span><button onClick={()=>void editCompany(c)} className="rounded bg-sky-600 px-3 py-2 font-semibold text-white">Editar</button><button onClick={()=>void editMonthlyLimit(c)} className="rounded bg-violet-600 px-3 py-2 font-semibold text-white">Límite</button><button onClick={()=>void deleteCompany(c)} className="rounded bg-rose-600 px-3 py-2 font-semibold text-white">Eliminar</button><button onClick={()=>void renew(c.id)} className="rounded bg-emerald-600 px-3 py-2 font-semibold text-white">Marcar pagado · 30 días</button></div>})}</div>
     </section></div>}
   </>;
