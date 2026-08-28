@@ -1,6 +1,17 @@
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
+function invitationErrorMessage(message?: string) {
+  const normalized = message?.toLowerCase() ?? "";
+  if (normalized.includes("rate limit") || normalized.includes("over_email_send_rate_limit")) {
+    return "El servicio de correo alcanzó su límite temporal. No se creó ninguna cuenta. Espera antes de reenviar o configura SMTP propio en Supabase para enviar invitaciones sin este límite.";
+  }
+  if (normalized.includes("already") || normalized.includes("exists") || normalized.includes("registered")) {
+    return "Este correo ya tiene una cuenta registrada. Usa otro correo o revisa los usuarios creados.";
+  }
+  return "No se pudo enviar la invitación. No se creó ninguna cuenta; inténtalo nuevamente.";
+}
+
 export async function POST(request: Request) {
   const sessionClient = await createClient();
   const { data: { user } } = await sessionClient.auth.getUser();
@@ -20,7 +31,10 @@ export async function POST(request: Request) {
     redirectTo: activationUrl,
     data: { username: username.trim().toLowerCase(), full_name: fullName?.trim() ?? "" },
   });
-  if (error || !data.user) return Response.json({ error: "No se pudo enviar la invitación. El usuario o correo quizá ya existe." }, { status: 400 });
+  if (error || !data.user) {
+    console.error("[user invitation]", { email: email.trim().toLowerCase(), message: error?.message ?? "missing invited user" });
+    return Response.json({ error: invitationErrorMessage(error?.message) }, { status: 429 });
+  }
   const { error: profileError } = await admin.from("profiles").update({ company_id: companyId, must_change_password: true }).eq("id", data.user.id);
   if (profileError) return Response.json({ error: "La invitación fue enviada, pero no pudo asignarse a la empresa." }, { status: 500 });
   return Response.json({ ok: true });

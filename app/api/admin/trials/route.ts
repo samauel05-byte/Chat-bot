@@ -5,6 +5,17 @@ function isValidUsername(value: string) {
   return /^[a-zA-Z0-9_.-]{3,40}$/.test(value);
 }
 
+function invitationErrorMessage(message?: string) {
+  const normalized = message?.toLowerCase() ?? "";
+  if (normalized.includes("rate limit") || normalized.includes("over_email_send_rate_limit")) {
+    return "El servicio de correo alcanzó su límite temporal. No se creó ninguna cuenta. Espera antes de reenviar o configura SMTP propio en Supabase para enviar invitaciones sin este límite.";
+  }
+  if (normalized.includes("already") || normalized.includes("exists") || normalized.includes("registered")) {
+    return "Este correo ya tiene una cuenta registrada. Usa otro correo o revisa los usuarios creados.";
+  }
+  return "No se pudo enviar la invitación. No se creó ninguna cuenta; inténtalo nuevamente.";
+}
+
 export async function POST(request: Request) {
   const sessionClient = await createClient();
   const { data: { user } } = await sessionClient.auth.getUser();
@@ -52,7 +63,8 @@ export async function POST(request: Request) {
   });
   if (inviteError || !invited.user) {
     await admin.from("companies").delete().eq("id", company.id);
-    return Response.json({ error: "No se pudo enviar la invitación. El correo quizá ya tiene una cuenta." }, { status: 400 });
+    console.error("[trial invitation]", { email, message: inviteError?.message ?? "missing invited user" });
+    return Response.json({ error: invitationErrorMessage(inviteError?.message) }, { status: 429 });
   }
 
   const { error: profileError } = await admin.from("profiles").update({ company_id: company.id, must_change_password: true }).eq("id", invited.user.id);

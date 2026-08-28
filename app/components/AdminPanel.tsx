@@ -32,6 +32,8 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
   const [trialFirstName, setTrialFirstName] = useState("");
   const [trialLastName, setTrialLastName] = useState("");
   const [trialEmail, setTrialEmail] = useState("");
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [isCreatingTrial, setIsCreatingTrial] = useState(false);
   const [showAllUsers, setShowAllUsers] = useState(false);
   const activeTrialCount = companies.filter((company) => company.is_trial).length;
 
@@ -113,27 +115,35 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
   }
   async function createUser(event: React.FormEvent) {
     event.preventDefault();
-    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-    const response = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, email, companyId, fullName }) });
-    const result = await response.json();
-    setStatus(response.ok ? "Invitación enviada y usuario asignado a la empresa." : result.error);
-    if (response.ok) { setUsername(""); setFirstName(""); setLastName(""); setEmail(""); await load(); }
+    if (isCreatingUser) return;
+    setIsCreatingUser(true);
+    try {
+      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+      const response = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, email, companyId, fullName }) });
+      const result = await response.json();
+      setStatus(response.ok ? "Invitación enviada y usuario asignado a la empresa." : result.error);
+      if (response.ok) { setUsername(""); setFirstName(""); setLastName(""); setEmail(""); await load(); }
+    } finally { setIsCreatingUser(false); }
   }
   async function createTrial(event: React.FormEvent) {
     event.preventDefault();
-    const response = await fetch("/api/admin/trials", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        companyName: trialCompanyName,
-        username: trialUsername.replace(/\s/g, ""),
-        email: trialEmail,
-        fullName: `${trialFirstName.trim()} ${trialLastName.trim()}`.trim(),
-      }),
-    });
-    const result = await response.json();
-    setStatus(response.ok ? "Prueba enviada: el cliente podrá exportar un máximo total de 5 facturas." : result.error ?? "No se pudo enviar la prueba.");
-    if (response.ok) { setTrialCompanyName(""); setTrialUsername(""); setTrialFirstName(""); setTrialLastName(""); setTrialEmail(""); await load(); }
+    if (isCreatingTrial) return;
+    setIsCreatingTrial(true);
+    try {
+      const response = await fetch("/api/admin/trials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyName: trialCompanyName,
+          username: trialUsername.replace(/\s/g, ""),
+          email: trialEmail,
+          fullName: `${trialFirstName.trim()} ${trialLastName.trim()}`.trim(),
+        }),
+      });
+      const result = await response.json();
+      setStatus(response.ok ? "Prueba enviada: el cliente podrá exportar un máximo total de 5 facturas." : result.error ?? "No se pudo enviar la prueba.");
+      if (response.ok) { setTrialCompanyName(""); setTrialUsername(""); setTrialFirstName(""); setTrialLastName(""); setTrialEmail(""); await load(); }
+    } finally { setIsCreatingTrial(false); }
   }
   async function convertTrial(company: Company) {
     if (!window.confirm(`¿Activar “${company.name}” como cliente regular? Se quitará el límite de prueba de 5 facturas.`)) return;
@@ -181,8 +191,8 @@ export function AdminPanel({ open, onClose }: { open: boolean; onClose: () => vo
     {open && <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm"><section className="mx-auto max-w-2xl rounded-2xl bg-white p-6 text-slate-900 shadow-2xl">
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-bold">Clientes y licencias</h2><div className="flex items-center gap-3"><button onClick={()=>setShowAllUsers(true)} className="rounded border border-violet-300 px-3 py-2 text-sm font-semibold text-violet-700">Ver todos ({profiles.length})</button><button onClick={onClose}>Cerrar</button></div></div>
       <form onSubmit={createCompany} className="mt-5 grid gap-2 sm:grid-cols-4"><input required value={name} onChange={e=>setName(e.target.value)} placeholder="Nombre de empresa" className="rounded border p-2"/><input value={rnc} onChange={e=>setRnc(e.target.value)} placeholder="RNC (opcional)" className="rounded border p-2"/><label className="relative"><input min="1" type="number" value={monthlyLimit} onChange={e=>setMonthlyLimit(e.target.value)} placeholder="Límite mensual" className="w-full rounded border p-2"/><span className="mt-1 block text-xs text-slate-500">Costo estimado: {usd.format((Number(monthlyLimit) || 0) * COST_PER_INVOICE_USD)}</span></label><button className="rounded bg-violet-600 px-3 py-2 font-semibold text-white">Crear empresa</button></form>
-      <h3 className="mt-6 font-semibold">Crear usuario para una empresa</h3><p className="mt-1 text-sm text-slate-600">La persona recibirá un correo para activar su cuenta y crear su contraseña.</p><form onSubmit={createUser} className="mt-2 grid gap-2 sm:grid-cols-2"><input required minLength={3} value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Nombre" className="rounded border p-2"/><input required value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Apellido" className="rounded border p-2"/><input required type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Correo" className="rounded border p-2"/><select required value={companyId} onChange={e=>setCompanyId(e.target.value)} className="rounded border p-2 sm:col-span-2"><option value="">Empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button className="rounded bg-slate-900 px-3 py-2 font-semibold text-white sm:col-span-2">Enviar invitación y activar usuario</button></form>
-      <h3 className="mt-6 font-semibold">Enviar prueba del sistema</h3><p className="mt-1 text-sm text-slate-600">Puedes tener hasta 5 cuentas de prueba activas. Cada una permite exportar 5 facturas en total; al agotarlas, no se recargan hasta que tú actives su plan regular.</p><form onSubmit={createTrial} className="mt-2 grid gap-2 sm:grid-cols-2"><input required disabled={activeTrialCount >= 5} minLength={2} value={trialCompanyName} onChange={e=>setTrialCompanyName(e.target.value)} placeholder="Empresa del cliente" className="rounded border p-2 disabled:bg-slate-100"/><input required disabled={activeTrialCount >= 5} minLength={3} value={trialUsername} onChange={e=>setTrialUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2 disabled:bg-slate-100"/><input required disabled={activeTrialCount >= 5} value={trialFirstName} onChange={e=>setTrialFirstName(e.target.value)} placeholder="Nombre" className="rounded border p-2 disabled:bg-slate-100"/><input required disabled={activeTrialCount >= 5} value={trialLastName} onChange={e=>setTrialLastName(e.target.value)} placeholder="Apellido" className="rounded border p-2 disabled:bg-slate-100"/><input required disabled={activeTrialCount >= 5} type="email" value={trialEmail} onChange={e=>setTrialEmail(e.target.value)} placeholder="Correo" className="rounded border p-2 disabled:bg-slate-100 sm:col-span-2"/><div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 sm:col-span-2">Pruebas activas: {activeTrialCount} / 5 · Incluye 5 facturas exportadas por cuenta.</div><button disabled={activeTrialCount >= 5} className="rounded bg-emerald-600 px-3 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400 sm:col-span-2">{activeTrialCount >= 5 ? "Límite de pruebas alcanzado" : "Enviar cuenta de prueba"}</button></form>
+      <h3 className="mt-6 font-semibold">Crear usuario para una empresa</h3><p className="mt-1 text-sm text-slate-600">La persona recibirá un correo para activar su cuenta y crear su contraseña.</p><form onSubmit={createUser} className="mt-2 grid gap-2 sm:grid-cols-2"><input required disabled={isCreatingUser} minLength={3} value={username} onChange={e=>setUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required disabled={isCreatingUser} value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="Nombre" className="rounded border p-2"/><input required disabled={isCreatingUser} value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Apellido" className="rounded border p-2"/><input required disabled={isCreatingUser} type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Correo" className="rounded border p-2"/><select required disabled={isCreatingUser} value={companyId} onChange={e=>setCompanyId(e.target.value)} className="rounded border p-2 sm:col-span-2"><option value="">Empresa…</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><button disabled={isCreatingUser} className="rounded bg-slate-900 px-3 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400 sm:col-span-2">{isCreatingUser ? "Enviando invitación…" : "Enviar invitación y activar usuario"}</button></form>
+      <h3 className="mt-6 font-semibold">Enviar prueba del sistema</h3><p className="mt-1 text-sm text-slate-600">Puedes tener hasta 5 cuentas de prueba activas. Cada una permite exportar 5 facturas en total; al agotarlas, no se recargan hasta que tú actives su plan regular.</p><form onSubmit={createTrial} className="mt-2 grid gap-2 sm:grid-cols-2"><input required disabled={activeTrialCount >= 5 || isCreatingTrial} minLength={2} value={trialCompanyName} onChange={e=>setTrialCompanyName(e.target.value)} placeholder="Empresa del cliente" className="rounded border p-2 disabled:bg-slate-100"/><input required disabled={activeTrialCount >= 5 || isCreatingTrial} minLength={3} value={trialUsername} onChange={e=>setTrialUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2 disabled:bg-slate-100"/><input required disabled={activeTrialCount >= 5 || isCreatingTrial} value={trialFirstName} onChange={e=>setTrialFirstName(e.target.value)} placeholder="Nombre" className="rounded border p-2 disabled:bg-slate-100"/><input required disabled={activeTrialCount >= 5 || isCreatingTrial} value={trialLastName} onChange={e=>setTrialLastName(e.target.value)} placeholder="Apellido" className="rounded border p-2 disabled:bg-slate-100"/><input required disabled={activeTrialCount >= 5 || isCreatingTrial} type="email" value={trialEmail} onChange={e=>setTrialEmail(e.target.value)} placeholder="Correo" className="rounded border p-2 disabled:bg-slate-100 sm:col-span-2"/><div className="rounded border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 sm:col-span-2">Pruebas activas: {activeTrialCount} / 5 · Incluye 5 facturas exportadas por cuenta.</div><button disabled={activeTrialCount >= 5 || isCreatingTrial} className="rounded bg-emerald-600 px-3 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400 sm:col-span-2">{activeTrialCount >= 5 ? "Límite de pruebas alcanzado" : isCreatingTrial ? "Enviando cuenta de prueba…" : "Enviar cuenta de prueba"}</button></form>
       {editingUser && <form onSubmit={saveUser} className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4"><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Editar usuario</h3><button type="button" onClick={()=>setEditingUser(null)} className="text-sm underline">Cancelar</button></div><p className="mt-1 text-sm text-slate-600">Actualiza el nombre, apellido o usuario. Si asignas una clave, el usuario tendrá que cambiarla obligatoriamente al entrar.</p><div className="mt-3 grid gap-2 sm:grid-cols-2"><input required minLength={3} value={editUsername} onChange={e=>setEditUsername(e.target.value.replace(/\s/g,""))} placeholder="Usuario" className="rounded border p-2"/><input required value={editFirstName} onChange={e=>setEditFirstName(e.target.value)} placeholder="Nombre" className="rounded border p-2"/><input required value={editLastName} onChange={e=>setEditLastName(e.target.value)} placeholder="Apellido" className="rounded border p-2"/><input minLength={8} type="password" value={editPassword} onChange={e=>setEditPassword(e.target.value)} placeholder="Nueva contraseña (opcional)" className="rounded border p-2"/></div><button className="mt-3 rounded bg-sky-600 px-3 py-2 font-semibold text-white">Guardar cambios</button></form>}
       {status && <p className="mt-3 text-sm text-violet-700">{status}</p>}
       {showAllUsers && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4"><section className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"><div className="flex items-center justify-between gap-3"><div><h3 className="text-lg font-bold">Todos los usuarios</h3><p className="text-sm text-slate-600">{profiles.length} usuario{profiles.length === 1 ? "" : "s"} creado{profiles.length === 1 ? "" : "s"}</p></div><button onClick={()=>setShowAllUsers(false)} className="rounded border px-3 py-2 text-sm">Cerrar</button></div><div className="mt-4 space-y-2">{profiles.map(profile=>{const company = Array.isArray(profile.companies) ? profile.companies[0] : profile.companies; const state = profile.role === "owner" ? "Súper administrador" : company?.name ? `Empresa: ${company.name}` : "Pendiente de asignar"; return <div key={profile.id} className="rounded-xl border p-3 text-sm"><b>{profile.username || "Sin usuario"}</b>{profile.full_name && <span> · {profile.full_name}</span>}<br/><span className={profile.role === "owner" ? "font-medium text-violet-700" : "text-slate-600"}>{state}</span></div>})}{profiles.length === 0 && <p className="text-sm text-slate-500">Aún no hay usuarios creados.</p>}</div></section></div>}
