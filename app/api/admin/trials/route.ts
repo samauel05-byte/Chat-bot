@@ -23,6 +23,15 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { count: activeTrialCount, error: trialCountError } = await admin
+    .from("companies")
+    .select("id", { count: "exact", head: true })
+    .eq("is_trial", true);
+  if (trialCountError) return Response.json({ error: "No se pudo validar las cuentas de prueba." }, { status: 500 });
+  if ((activeTrialCount ?? 0) >= 5) {
+    return Response.json({ error: "Ya tienes las 5 cuentas de prueba activas. Convierte o elimina una para crear otra." }, { status: 400 });
+  }
+
   const { data: duplicate } = await admin.from("profiles").select("id").ilike("username", username).maybeSingle();
   if (duplicate) return Response.json({ error: "Ese usuario ya está en uso." }, { status: 400 });
 
