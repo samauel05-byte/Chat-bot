@@ -128,6 +128,18 @@ async function ensureReportCanBeGenerated(companyId: string | null, recordCount:
   }
 }
 
+function currentBillingPeriod() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Santo_Domingo",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  if (!year || !month) throw new Error("No se pudo determinar el período de consumo.");
+  return `${year}${month}`;
+}
+
 async function generateLimitedReport(
   tipo: "606" | "607" | "IR17",
   periodo: string,
@@ -139,7 +151,10 @@ async function generateLimitedReport(
   // Excel/TXT final, nunca PDFs subidos ni una exportación fallida.
   await ensureReportCanBeGenerated(companyId, rows.length);
   const report = await generateReport(tipo, periodo, rows);
-  await consumeInvoiceQuota(companyId, periodo, report.recordCount);
+  // El límite y el cobro son mensuales por fecha de exportación, no por el
+  // período fiscal escrito en la factura. Así un 606 de julio exportado en
+  // agosto se factura y muestra dentro del consumo de agosto.
+  await consumeInvoiceQuota(companyId, currentBillingPeriod(), report.recordCount);
   return report;
 }
 
