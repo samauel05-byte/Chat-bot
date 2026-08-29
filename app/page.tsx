@@ -19,13 +19,16 @@ export default async function Home() {
   }
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return <LoginForm />;
+  // `proxy.ts` ya valida y refresca la sesión mediante getClaims. Repetir
+  // getUser aquí agrega otra llamada de red antes de mostrar la aplicación.
+  const { data: claims } = await supabase.auth.getClaims();
+  const userId = typeof claims?.claims?.sub === "string" ? claims.claims.sub : null;
+  if (!userId) return <LoginForm />;
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, company_id, username, full_name, must_change_password, companies(name, license_expires_at, license_status, is_trial)")
-    .eq("id", user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   const company = Array.isArray(profile?.companies) ? profile.companies[0] : profile?.companies;
@@ -52,7 +55,7 @@ export default async function Home() {
       <NalaWorkspace
         isOwner={profile?.role === "owner"}
         quotaContext={createQuotaContext(profile?.company_id ?? null)}
-        accountName={profile?.full_name || profile?.username || user.email || "Mi cuenta"}
+        accountName={profile?.full_name || profile?.username || claims?.claims?.email || "Mi cuenta"}
         mustChangePassword={profile?.role !== "owner" && Boolean(profile?.must_change_password)}
       />
     </>
