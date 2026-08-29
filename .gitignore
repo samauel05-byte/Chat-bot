@@ -46,3 +46,6 @@ next-env.d.ts
 
 # trigger.dev
 .trigger
+
+# Supabase CLI cache
+supabase/.temp/
