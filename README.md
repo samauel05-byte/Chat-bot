@@ -1,95 +1,62 @@
-# Chatbot de facturación 606 / 607
+# CAMI — Control y Análisis de Movimientos e Impuestos
 
-Chatbot que recibe facturas (foto/PDF) por chat, extrae los datos con IA, determina si son
-compras (Formato 606) o ventas (Formato 607) según el RNC de tu empresa, y genera los archivos
-listos para la DGII (Oficina Virtual) por período.
+CAMI es una plataforma contable y tributaria para organizar, analizar y preparar información fiscal de la República Dominicana. Integra en una sola experiencia el análisis de compras, ventas y tarjetas con **NALA**, su asistente fiscal con inteligencia artificial.
 
-No usa base de datos relacional: todo se guarda como archivos (CSV/JSON/XLSX) en **Vercel Blob**,
-como blobs privados (requieren el token para leerse, no son URLs públicas adivinables).
+## Módulos integrados
 
-## Requisitos antes de correrlo
+- **Análisis fiscal:** 606, 607, CardNET, Azul, IT-1 e IR-2.
+- **NALA · Asistente fiscal IA:** recibe facturas en imagen o PDF, extrae sus datos, permite revisarlos y genera archivos 606/607.
+- **Acceso y licencias:** autenticación, empresas, perfiles, vencimientos y administración mediante Supabase.
+- **Exportaciones:** archivos XLSX y TXT preparados para revisión antes de cargarlos en la Oficina Virtual de la DGII.
 
-1. **Clave de OpenAI**: copia `.env.local.example` a `.env.local` (o edita el que ya existe) y
-   agrega tu `OPENAI_API_KEY`. El modelo (`gpt-5.6-terra`) necesita soporte de visión para
-   leer las facturas adjuntas.
-2. `TRIGGER_SECRET_KEY` (dev) ya viene configurada en `.env.local` (proyecto `chat-bot-606-607`
-   en Trigger.dev, org Samkill).
-3. **`BLOB_READ_WRITE_TOKEN`**: crea un Blob store en Vercel (Dashboard → proyecto `chat-bot` →
-   pestaña Storage → Create → Blob → Connect Project) y copia el token a `.env.local`. El mismo
-   token sirve para desarrollo local y para producción.
+El analizador estable se muestra dentro del espacio autenticado de CAMI. Su URL se configura con `NEXT_PUBLIC_CAMI_ANALYSIS_URL`, lo que permite mantener el sistema actual en producción mientras la plataforma unificada se valida en una vista previa.
 
-## Correr en desarrollo
+## Requisitos
 
-Se necesitan dos procesos en paralelo:
+- Node.js compatible con Next.js 16.
+- Un proyecto de Supabase con las migraciones incluidas en `supabase/migrations`.
+- OpenAI para la extracción inteligente de documentos.
+- Vercel Blob para almacenar archivos y reportes.
+- Trigger.dev para ejecutar el procesamiento en segundo plano.
+
+Copia `.env.local.example` a `.env.local` y configura las variables indicadas. No publiques ni confirmes secretos en Git.
+
+## Desarrollo local
+
+Instala las dependencias y ejecuta la aplicación:
+
+```bash
+npm ci
+npm run dev
+```
+
+Cuando necesites probar el procesamiento de documentos, inicia Trigger.dev en otra terminal:
 
 ```bash
 npm run dev:trigger
 ```
 
+La aplicación estará disponible en [http://localhost:3000](http://localhost:3000). El análisis fiscal se abre en `/analisis` y el asistente NALA en `/`.
+
+## Verificación
+
+Antes de publicar cambios ejecuta:
+
 ```bash
-npm run dev
+npm test
+npm run lint
+npm run build
 ```
 
-Abre [http://localhost:3000](http://localhost:3000). Lo primero que te va a pedir el bot es el
-RNC de tu empresa (se guarda una sola vez como blob `config.json`).
+Los archivos fiscales generados deben revisarse y validarse con las herramientas oficiales de la DGII antes de presentarlos. CAMI facilita la preparación y conciliación de los datos, pero no sustituye la revisión profesional ni la responsabilidad del contribuyente.
 
-## Desplegar en producción
+## Despliegue
 
-Dos sistemas se despliegan por separado:
+La aplicación web se despliega en Vercel y el procesamiento asíncrono en Trigger.dev. Las variables de producción deben configurarse en ambos servicios según corresponda. Los cambios de integración se prueban primero en una rama y una vista previa; la producción se promueve únicamente después de verificar autenticación, navegación, análisis, carga de documentos y exportaciones.
 
-- **Vercel** (la app web/chat): el proyecto `chat-bot` ya está enlazado al repo de GitHub —
-  cada push a `main` dispara un deploy automático. Hace falta configurar en Vercel (Settings →
-  Environment Variables, Production):
-  - `TRIGGER_SECRET_KEY` — la clave **prod** (no la de dev), desde el dashboard de Trigger.dev →
-    proyecto → API Keys.
-  - `BLOB_READ_WRITE_TOKEN` — se agrega solo al crear el Blob store desde la pestaña Storage.
-- **Trigger.dev** (el agente de chat, corre en la infraestructura de Trigger.dev, no en Vercel):
-  hay que configurar, en el dashboard del proyecto → Environment Variables → **Prod**:
-  - `OPENAI_API_KEY`
-  - `BLOB_READ_WRITE_TOKEN` (el mismo valor que en Vercel)
+## Seguridad
 
-  y luego desplegar con `npx trigger.dev@latest deploy` (o pedírmelo).
-
-## Cómo funciona
-
-1. Adjuntas una factura (imagen o PDF) en el chat, y opcionalmente marcas si es "Compra (606)" o
-   "Venta (607)" con los botones de la interfaz.
-2. El modelo la lee directamente y extrae los campos. Si no elegiste el tipo explícitamente,
-   decide comparando el RNC emisor/receptor contra el RNC de tu empresa.
-3. Te muestra un resumen y pide confirmación antes de guardar nada.
-4. Al confirmar, se agrega una fila al blob `606.csv` o `607.csv` con exactamente las mismas
-   columnas que usa la herramienta oficial de la DGII.
-5. Cuando pides el reporte de un período (ej. "genera el 606 de julio 2025"), se generan:
-   - un `.xlsx` de revisión con las mismas columnas que la plantilla oficial
-   - un `.txt` delimitado por `|`, sin encabezado, en el formato que acepta la Oficina Virtual
-
-   Ambos quedan como blobs privados; el bot te da un link `/api/exports/<archivo>` que los sirve
-   a través de la app (no son URLs públicas de Vercel Blob).
-
-## Estructura de datos (fuente: DGII)
-
-Las columnas y catálogos de `lib/dgii/schema606.ts` y `lib/dgii/schema607.ts` se tomaron
-directamente de las herramientas oficiales de la DGII que se usaron para construir este proyecto:
-
-- `Herramienta de Envio Formato 606.xls` (Versión 2020.2)
-- `Herramienta de Envio Formato 607.xls` (Versión 2023.1.1)
-
-Si la DGII publica una versión más nueva con columnas distintas, esos dos archivos son el único
-lugar que hay que actualizar.
-
-## Importante — verificación antes de presentar
-
-El `.txt` generado sigue el formato conocido de envío (pipe-delimited, sin encabezado, sin las
-columnas auxiliares "Líneas"/"Estatus" que sólo existen en la herramienta Excel). Aun así,
-**antes de subir cualquier archivo a la Oficina Virtual de la DGII**, ábrelo y valídalo con la
-herramienta oficial de la DGII (o revísalo con tu contador) — esto automatiza la extracción y el
-armado del archivo, pero la responsabilidad de lo que se declara sigue siendo tuya.
-
-## Limitaciones conocidas
-
-- Es una app de un solo usuario/empresa — no hay multi-tenant ni login. La ruta de descarga
-  (`/api/exports/...`) no está protegida por autenticación propia; si te preocupa que alguien
-  adivine la URL exacta de un export, activa Vercel Authentication / protección de deployment en
-  el proyecto (Settings → Deployment Protection).
-- La extracción por IA de fotos puede fallar en dígitos de NCF, RNC o montos — por eso el bot
-  siempre pide confirmación antes de guardar.
+- Las rutas principales requieren una sesión válida.
+- Las licencias y empresas se validan en el servidor.
+- Los documentos se guardan en almacenamiento privado.
+- Nunca se deben exponer `OPENAI_API_KEY`, claves de Supabase con privilegios, tokens de Blob ni claves de Trigger.dev.
