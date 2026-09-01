@@ -1,9 +1,8 @@
+import { AnalysisWorkspace } from "@/app/components/AnalysisWorkspace";
 import { LicenseBlock } from "@/app/components/LicenseBlock";
 import { LicenseNotice } from "@/app/components/LicenseNotice";
 import { LoginForm } from "@/app/components/LoginForm";
-import { NalaWorkspace } from "@/app/components/NalaWorkspace";
 import { createClient } from "@/lib/supabase/server";
-import { createQuotaContext } from "@/lib/quota-context";
 
 export const dynamic = "force-dynamic";
 
@@ -13,14 +12,12 @@ function isConfigured() {
   );
 }
 
-export default async function Home() {
+export default async function AnalysisPage() {
   if (!isConfigured()) {
     return <LicenseBlock reason="CAMI está terminando su configuración segura. Intenta de nuevo en unos minutos." />;
   }
 
   const supabase = await createClient();
-  // `proxy.ts` ya valida y refresca la sesión mediante getClaims. Repetir
-  // getUser aquí agrega otra llamada de red antes de mostrar la aplicación.
   const { data: claims } = await supabase.auth.getClaims();
   const userId = typeof claims?.claims?.sub === "string" ? claims.claims.sub : null;
   if (!userId) return <LoginForm />;
@@ -52,9 +49,8 @@ export default async function Home() {
   return (
     <>
       {hasExpiringLicense && <LicenseNotice expiresAt={expiresAt!} days={daysRemaining} />}
-      <NalaWorkspace
+      <AnalysisWorkspace
         isOwner={profile?.role === "owner"}
-        quotaContext={createQuotaContext(profile?.company_id ?? null)}
         accountName={profile?.full_name || profile?.username || claims?.claims?.email || "Mi cuenta"}
         mustChangePassword={profile?.role !== "owner" && Boolean(profile?.must_change_password)}
       />

@@ -4,20 +4,20 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? "https://chat-9835cqur9-samkill.vercel.app"
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://analisis-itbis.vercel.app"
   ),
-  title: "NALA — Núcleo Automatizado de Listados Administrativos",
-  description: "🤖 Automatiza la preparación de información para la DGII",
+  title: "CAMI — Control y Análisis de Movimientos e Impuestos",
+  description: "Plataforma contable y tributaria con análisis fiscal y asistente IA para la DGII",
   icons: {
     icon: [
-      { url: "/logo.svg", type: "image/svg+xml" },
+      { url: "/cami-logo.png", type: "image/png" },
     ],
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "NALA — Núcleo Automatizado de Listados Administrativos",
-    description: "🤖 Automatiza la preparación de información para la DGII",
-    images: [{ url: "/logo.svg", width: 576, height: 576 }],
+    title: "CAMI — Control y Análisis de Movimientos e Impuestos",
+    description: "Plataforma contable y tributaria con análisis fiscal y asistente IA para la DGII",
+    images: [{ url: "/cami-logo.png", width: 512, height: 512 }],
   },
 };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react";
@@ -274,18 +275,19 @@ export function Chat({ quotaContext, accountName, onOpenAccount, onOpenAdmin }: 
       <header className="flex flex-col gap-3 border-b border-black/5 bg-white px-3 py-3 shadow-sm dark:border-white/10 dark:bg-neutral-900 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center sm:h-14 sm:w-14">
-            <Image src="/logo.svg" alt="NALA" width={56} height={56} priority className="h-11 w-11 sm:h-14 sm:w-14" />
+            <Image src="/cami-logo.png" alt="CAMI" width={56} height={56} priority className="h-11 w-11 rounded-xl sm:h-14 sm:w-14" />
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-50 sm:text-base lg:text-lg">
-              <span className="sm:hidden">NALA</span><span className="hidden sm:inline">NALA — Núcleo Automatizado de Listados Administrativos</span>
+              <span className="sm:hidden">CAMI IA</span><span className="hidden sm:inline">CAMI · Asistente fiscal IA — NALA</span>
             </h1>
             <p className="hidden text-xs text-neutral-500 dark:text-neutral-400 md:block">
-              🤖 Automatiza la preparación de información para la DGII
+              NALA automatiza la preparación de información para la DGII
             </p>
           </div>
         </div>
         <div className="flex w-full items-center gap-2 sm:w-auto">
+          <Link href="/analisis" className="flex-1 rounded-lg bg-cyan-600 px-2.5 py-2 text-center text-xs font-semibold text-white hover:bg-cyan-700 sm:flex-none sm:px-3 sm:text-sm">📊 <span className="sm:hidden">Análisis</span><span className="hidden sm:inline">Análisis fiscal</span></Link>
           {onOpenAdmin && <button type="button" onClick={onOpenAdmin} className="flex-1 rounded-lg border border-violet-200 px-2.5 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50 dark:border-violet-500/40 dark:text-violet-300 sm:flex-none sm:px-3 sm:text-sm">☰ <span className="sm:hidden">Admin</span><span className="hidden sm:inline">Administración</span></button>}
           <button type="button" onClick={onOpenAccount} className="min-w-0 flex-1 truncate rounded-lg border border-black/10 px-2.5 py-2 text-left text-xs font-semibold text-neutral-700 hover:bg-neutral-50 dark:border-white/15 dark:text-neutral-200 dark:hover:bg-white/10 sm:flex-none sm:px-3 sm:text-sm">👤 <span className="inline-block max-w-28 truncate align-bottom sm:max-w-36">{accountName}</span><span className="ml-2 hidden text-xs font-normal lg:inline">Cambiar clave</span></button>
         </div>
@@ -611,7 +613,7 @@ function MessageBubble({
         }
       >
         {isUser ? "🙂" : (
-          <Image src="/logo.svg" alt="NALA" width={28} height={28} className="h-7 w-7 rounded-full" />
+          <Image src="/cami-logo.png" alt="CAMI" width={28} height={28} className="h-7 w-7 rounded-full" />
         )}
       </div>
       <div
@@ -644,13 +646,13 @@ function WelcomeCard() {
         <div className="nala-orb-2 absolute -bottom-6 -right-6 h-28 w-28 rounded-full bg-violet-300/20 blur-2xl" />
         {/* Floating logo */}
         <div className="nala-float relative z-10 mb-4">
-          <Image src="/logo.svg" alt="NALA" width={72} height={72} priority className="rounded-2xl shadow-xl" />
+          <Image src="/cami-logo.png" alt="CAMI" width={72} height={72} priority className="rounded-2xl shadow-xl" />
         </div>
         <h2 className="relative z-10 text-center text-base font-bold text-white drop-shadow-sm">
-          NALA
+          NALA · Asistente fiscal IA
         </h2>
         <p className="relative z-10 mt-0.5 text-center text-xs text-violet-200">
-          Núcleo Automatizado de Listados Administrativos
+          El módulo inteligente de CAMI para organizar comprobantes y preparar reportes fiscales
         </p>
       </div>
       {/* Steps */}

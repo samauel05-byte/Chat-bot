@@ -3,13 +3,13 @@
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 
-const LETTERS = ["N", "A", "L", "A"];
+const LETTERS = ["C", "A", "M", "I"];
 
 const ACRONYM = [
-  { letter: "N", word: "Núcleo" },
-  { letter: "A", word: "Automatizado" },
-  { letter: "L", word: "de Listados" },
-  { letter: "A", word: "Administrativos" },
+  { letter: "C", word: "Control" },
+  { letter: "A", word: "Análisis" },
+  { letter: "M", word: "de Movimientos" },
+  { letter: "I", word: "e Impuestos" },
 ];
 
 // Accounting + bot themed particles: [symbol, x%, duration(s), delay(s), size(rem), opacity]
@@ -74,7 +74,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
           key="splash"
           role="button"
           tabIndex={0}
-          aria-label="Omitir presentación de NALA"
+          aria-label="Omitir presentación de CAMI"
           className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-violet-950 select-none cursor-pointer overflow-hidden"
           onClick={skip}
           onKeyDown={(event) => {
@@ -126,7 +126,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
             />
           </div>
 
-          {/* ── NALA letters ── */}
+          {/* ── CAMI letters ── */}
           <div className="relative flex gap-3 sm:gap-5">
             {LETTERS.map((letter, i) => (
               <motion.span
@@ -198,7 +198,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
             }}
             transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            🤖 Automatiza la preparación de información para la DGII
+            Análisis fiscal y asistencia inteligente para la DGII
           </motion.p>
 
           {/* ── Skip hint ── */}
