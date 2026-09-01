@@ -30,7 +30,6 @@ type BatchProgress = {
 };
 
 const BATCH_TOOL_NAMES = ["generateReport606", "generateReport607", "generateReportIR17"];
-const MAX_RECORDS_PER_BATCH = 33;
 const TRIAL_LICENSE_MESSAGE = "Esta cuenta tiene límites del administrador. Contacta a Samuel Roa para que te libere la licencia.";
 
 type QuotaResult = {
@@ -119,9 +118,6 @@ async function getTrialQuota(companyId: string | null): Promise<TrialQuota> {
 }
 
 async function ensureReportCanBeGenerated(companyId: string | null, recordCount: number) {
-  if (recordCount > MAX_RECORDS_PER_BATCH) {
-    throw new Error(`El archivo contiene más de ${MAX_RECORDS_PER_BATCH} facturas o retenciones. No se generó ningún Excel ni TXT.`);
-  }
   const trialQuota = await getTrialQuota(companyId);
   if (trialQuota.isTrial && (trialQuota.remaining ?? 0) < recordCount) {
     throw new Error(TRIAL_LICENSE_MESSAGE);
@@ -505,7 +501,8 @@ async function extractFilePart(
 
 async function extractLargeBatch(
   batch: BatchRequest,
-  tipo: "606" | "607" | "IR17"
+  tipo: "606" | "607" | "IR17",
+  maxRecords: number | null = null
 ): Promise<Record<string, unknown>[]> {
   // Ejecutar en orden conserva la trazabilidad de cada archivo y evita los
   // límites de la API. No se usa la señal del navegador: un lote fiscal debe
@@ -527,8 +524,11 @@ async function extractLargeBatch(
       batch.files.length
     );
     rows.push(...extracted);
-    if (rows.length > MAX_RECORDS_PER_BATCH) {
-      throw new Error(`El archivo contiene más de ${MAX_RECORDS_PER_BATCH} facturas o retenciones. No se generó ningún Excel ni TXT.`);
+    // Las cuentas de prueba no deben consumir más de sus facturas disponibles.
+    // Los clientes regulares pueden procesar lotes grandes, incluso PDFs de
+    // cientos de páginas, siempre sujetos al límite mensual de su empresa.
+    if (maxRecords !== null && rows.length > maxRecords) {
+      throw new Error(TRIAL_LICENSE_MESSAGE);
     }
   }
   return rows;
@@ -564,7 +564,6 @@ export const invoiceChat = chat.agent({
         message.includes("No se encontraron facturas") ||
         message.includes("No se pudo determinar el período") ||
         message.includes("El período debe tener formato") ||
-        message.includes("más de 33 facturas") ||
         message.includes(TRIAL_LICENSE_MESSAGE)
       ) {
         return `No se generó ningún archivo: ${message}`;
@@ -578,15 +577,13 @@ export const invoiceChat = chat.agent({
       const tipo = requestedType(batch.instruction);
       try {
         const expected = expectedCount(batch.instruction);
-        if (expected !== undefined && expected > MAX_RECORDS_PER_BATCH) {
-          throw new Error(`El archivo contiene más de ${MAX_RECORDS_PER_BATCH} facturas o retenciones. No se generó ningún Excel ni TXT.`);
-        }
         const trialQuota = await getTrialQuota(verifyQuotaContext(clientData));
-        if (trialQuota.isTrial && (trialQuota.remaining ?? 0) === 0) {
+        const trialRemaining = trialQuota.remaining ?? 0;
+        if (trialQuota.isTrial && (trialRemaining === 0 || (expected !== undefined && expected > trialRemaining))) {
           throw new Error(TRIAL_LICENSE_MESSAGE);
         }
         publishBatchProgress({ status: "preparando", current: 0, total: batch.files.length });
-        const rows = await extractLargeBatch(batch, tipo);
+        const rows = await extractLargeBatch(batch, tipo, trialQuota.isTrial ? trialRemaining : null);
 
         publishBatchProgress({
           status: "validando",
