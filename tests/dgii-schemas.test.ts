@@ -124,6 +124,22 @@ test("Excel 606: los menús desplegables comienzan en la primera factura", async
   assert.equal(reloaded.getWorksheet("DIGITAR")?.getCell("E1009").dataValidation.type, "list");
 });
 
+test("Excel 606: el menú de bienes cubre toda la columna con una validación estable", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("DIGITAR");
+  workbook.addWorksheet("Listas DGII");
+  addExcelDropdown(sheet, 4, 1, TIPO_BIENES_SERVICIOS_606, 10, 25);
+
+  const reloaded = new ExcelJS.Workbook();
+  await reloaded.xlsx.load(await workbook.xlsx.writeBuffer());
+  const digitSheet = reloaded.getWorksheet("DIGITAR")!;
+
+  assert.equal(digitSheet.getCell("D10").dataValidation.type, "list");
+  assert.equal(digitSheet.getCell("D25").dataValidation.type, "list");
+  assert.equal(digitSheet.getCell("D1009").dataValidation.type, "list");
+  assert.deepEqual(digitSheet.getCell("D10").dataValidation.formulae, ["DGII_LISTA_1"]);
+});
+
 test("Excel 606: Forma de Pago usa un menú compatible dentro de la celda", async () => {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("DIGITAR");

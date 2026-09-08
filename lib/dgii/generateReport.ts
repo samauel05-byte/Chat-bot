@@ -129,19 +129,26 @@ export function addExcelDropdown(
   // siguientes para que se puedan corregir o agregar facturas manualmente.
   const finalRow = Math.max(lastDataRow + 500, firstDataRow + 999);
   sheet.getColumn(column).numFmt = "@";
-  for (let row = firstDataRow; row <= finalRow; row += 1) {
-    sheet.getCell(row, column).dataValidation = {
-      type: "list",
-      allowBlank: true,
-      showInputMessage: true,
-      promptTitle: "Opciones DGII",
-      prompt: "Selecciona una opción del menú para esta casilla.",
-      // El listado ayuda a corregir, pero nunca debe bloquear que el usuario
-      // pueda escribir o pegar un valor cuando esté revisando una factura.
-      showErrorMessage: false,
-      formulae: [listFormula],
-    };
-  }
+  const targetRange = `${columnLetter(column)}${firstDataRow}:${columnLetter(column)}${finalRow}`;
+  // Una sola validación para toda la columna es considerablemente más estable
+  // que guardar cientos de validaciones individuales. Excel conserva así la
+  // flecha del menú tanto en las facturas exportadas como en filas nuevas.
+  const validations = (
+    sheet as ExcelJS.Worksheet & {
+      dataValidations: { add(range: string, validation: ExcelJS.DataValidation): void };
+    }
+  ).dataValidations;
+  validations.add(targetRange, {
+    type: "list",
+    allowBlank: true,
+    showInputMessage: true,
+    promptTitle: "Opciones DGII",
+    prompt: "Selecciona una opción del menú para esta casilla.",
+    // El listado ayuda a corregir, pero nunca debe bloquear que el usuario
+    // pueda escribir o pegar un valor cuando esté revisando una factura.
+    showErrorMessage: false,
+    formulae: [listFormula],
+  });
 }
 
 /**
