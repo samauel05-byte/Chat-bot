@@ -415,7 +415,12 @@ export async function generateReport(
 
   // Column widths
   [...columns, { key: "sumatoria", header: "Sumatoria" }].forEach((_, idx) => {
-    sheet.getColumn(idx + 1).width = 20;
+    const column = sheet.getColumn(idx + 1);
+    column.width = 20;
+    // Marca explícitamente todas las columnas del reporte como editables.
+    // Aunque la hoja no está protegida, algunos visores respetan el atributo
+    // "locked" predeterminado y bloquean la edición de archivos descargados.
+    column.protection = { locked: false };
   });
   const xlsxBuffer = await workbook.xlsx.writeBuffer();
 

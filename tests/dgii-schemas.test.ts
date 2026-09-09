@@ -152,3 +152,15 @@ test("Excel 606: Forma de Pago usa un menú compatible dentro de la celda", asyn
   assert.equal(validation?.type, "list");
   assert.match(String(validation?.formulae?.[0]), /^"01 - EFECTIVO,/);
 });
+
+test("Excel: las celdas del reporte pueden marcarse explícitamente como editables", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("DIGITAR");
+  sheet.getColumn(4).protection = { locked: false };
+  sheet.getCell("D10").value = "02 - GASTOS POR TRABAJOS, SUMINISTROS Y SERVICIOS";
+
+  const reloaded = new ExcelJS.Workbook();
+  await reloaded.xlsx.load(await workbook.xlsx.writeBuffer());
+
+  assert.equal(reloaded.getWorksheet("DIGITAR")!.getCell("D10").protection.locked, false);
+});
